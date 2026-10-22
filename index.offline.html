@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f120e">
+<title>Zombie Defence (offline)</title>
+<style>
+:root { color-scheme: dark; }
+html, body { height: 100%; margin: 0; background: #0f120e; color: #f3f0e2; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+body {
+	display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+	padding: 24px; box-sizing: border-box; text-align: center;
+	background: radial-gradient(120% 80% at 50% 110%, rgba(244, 165, 58, 0.16), transparent 60%), #0f120e;
+}
+h1 { margin: 0; font-family: 'Impact', 'Arial Black', sans-serif; font-weight: 400; font-size: clamp(30px, 8vw, 54px); letter-spacing: 0.04em; line-height: 1; }
+h1 span { color: #f4a53a; }
+p { margin: 0; max-width: 380px; color: #9ea392; font-size: 16px; line-height: 1.45; }
+button { min-width: 200px; min-height: 56px; border: 0; border-radius: 16px; background: #f4a53a; color: #1f1405; font: 700 20px 'Impact', 'Arial Black', sans-serif; letter-spacing: 0.06em; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>ZOMBIE <span>DEFENCE</span></h1>
+<p>No signal. The game needs one load with internet first, then it works offline.</p>
+<button onclick="location.reload()">TRY AGAIN</button>
+</body>
+</html>
