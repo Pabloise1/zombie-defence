@@ -1,9 +1,23 @@
 class_name RoomBlock
 extends PrefabBuilding
 const STOREY := 3.0
+# One gun ledge per storey, at a window, each storey facing a different side:
+# [window position, outward direction] in storey space.
+const LEDGES := [
+	[Vector3(0, 0, -1.82), Vector3(0, 0, -1)],
+	[Vector3(1.82, 0, 0), Vector3(1, 0, 0)],
+	[Vector3(-1.82, 0, 0), Vector3(-1, 0, 0)],
+	[Vector3(-0.85, 0, 1.82), Vector3(0, 0, 1)],
+]
+const LEDGE_OUT := 1.05
+const LEDGE_Y := 1.0
+const ROOF_SLOTS := 2
+static var _ledge_mesh: BoxMesh
+static var _ledge_mat: StandardMaterial3D
 var storeys := 1
 var floor_job = null
 var _cap: Node3D
+var _floor_slots: Array[Node3D] = []
 
 func _make_model() -> void:
 	model = Node3D.new()
@@ -14,6 +28,7 @@ func _make_model() -> void:
 func _rebuild_stack() -> void:
 	for c in model.get_children():
 		c.queue_free()
+	_floor_slots.clear()
 	for i in storeys:
 		var b := Art.model("room_block")
 		b.name = "Storey%d" % (i + 1)
@@ -22,10 +37,35 @@ func _rebuild_stack() -> void:
 		var rs := b.find_child("RoofSlot1", true, false)
 		if rs:
 			rs.name = "BlockSlot"
+		_floor_slots.append(_make_ledge(b, i))
 	_cap = Art.model("room_block_top")
 	_cap.name = "Cap"
 	_cap.position = Vector3(0, STOREY * storeys, 0)
 	model.add_child(_cap)
+
+func _make_ledge(storey: Node3D, i: int) -> Node3D:
+	if _ledge_mesh == null:
+		_ledge_mesh = BoxMesh.new()
+		_ledge_mesh.size = Vector3(2.3, 0.22, 2.1)
+		_ledge_mat = StandardMaterial3D.new()
+		_ledge_mat.albedo_color = Color(0.56, 0.55, 0.51)
+		_ledge_mat.roughness = 0.9
+	var l: Array = LEDGES[i % LEDGES.size()]
+	var out: Vector3 = l[1]
+	var at: Vector3 = l[0] + out * LEDGE_OUT
+	var slab := MeshInstance3D.new()
+	slab.name = "Ledge"
+	slab.mesh = _ledge_mesh
+	slab.material_override = _ledge_mat
+	slab.position = Vector3(at.x, LEDGE_Y - 0.11, at.z)
+	slab.rotation.y = atan2(-out.x, -out.z)
+	storey.add_child(slab)
+	var mk := Node3D.new()
+	mk.name = "FloorSlot"
+	mk.position = Vector3(at.x, LEDGE_Y, at.z)
+	mk.rotation.y = atan2(-out.x, -out.z)
+	storey.add_child(mk)
+	return mk
 
 func roof_height() -> float:
 	return STOREY * storeys + 0.1
@@ -34,12 +74,27 @@ func deck_height() -> float:
 	return STOREY * (storeys - 1) + 3.83 + 0.37
 
 func _slot_marker(i: int) -> Node3D:
+	if i >= ROOF_SLOTS:
+		var k := i - ROOF_SLOTS
+		return _floor_slots[k] if k < _floor_slots.size() else null
 	if _cap == null:
 		return null
 	return _cap.find_child("RoofSlot%d" % (i + 1), true, false) as Node3D
 
 func slot_count() -> int:
-	return 2
+	return ROOF_SLOTS + storeys
+
+func _grow_slots() -> void:
+	while mounted.size() < slot_count():
+		mounted.append(null)
+
+func _take_over(old) -> void:
+	if old is RoomBlock and old.storeys != storeys:
+		storeys = old.storeys
+		max_hp = float(def.get("hp", 3000.0)) * storeys
+		_rebuild_stack()
+		_grow_slots()
+	super._take_over(old)
 
 func capacity() -> int:
 	return 4 * storeys
@@ -118,6 +173,7 @@ func finish_floor() -> void:
 	hp = max_hp * frac + float(def.get("hp", 3000.0))
 	hp = minf(hp, max_hp)
 	_rebuild_stack()
+	_grow_slots()
 	for i in mounted.size():
 		var g = mounted[i]
 		if g != null and is_instance_valid(g):
@@ -151,6 +207,11 @@ func card_lines() -> Array:
 	if not incoming.is_empty():
 		s += "  (+%d coming)" % incoming.size()
 	out.append(s)
+	var free := 0
+	for i in mounted.size():
+		if mounted[i] == null or not is_instance_valid(mounted[i]):
+			free += 1
+	out.append("Gun slots %d free of %d  ·  2 on the roof, 1 on each floor" % [free, mounted.size()])
 	if floor_job != null and is_instance_valid(floor_job):
 		out.append("Building storey %d: %d%%" % [storeys + 1, int(floor_job.progress * 100.0)])
 	return out

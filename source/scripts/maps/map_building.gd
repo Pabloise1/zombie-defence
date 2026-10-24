@@ -194,6 +194,7 @@ func card_lines() -> Array:
 			out.append("Being secured  %d%%" % int(progress * 100.0))
 		else:
 			out.append("Not yours. Claim it: workers secure it (~%ds)" % int(def.get("claim_time", 18.0)))
+			out.append("Safe house: survivors out here hide in it till the wave ends")
 			out.append("Might hide survivors or supplies")
 		if kind == "petrol_station" and not exploded:
 			out.append("Pumps: a shell or blast there sets them off. Big explosion")
@@ -201,6 +202,8 @@ func card_lines() -> Array:
 			out.append("Burnt out")
 		return out
 	out = super.card_lines()
+	var n: int = G.people.sheltered_in(self) if G.people else 0
+	out.insert(0, "Safe house  ·  sheltering %d/%d  ·  draws survivors" % [n, G.people.shelter_cap(self) if G.people else 0])
 	if kind == "petrol_station" and not exploded:
 		out.append("Careful: hits on the pumps blow it up")
 	return out

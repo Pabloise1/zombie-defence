@@ -56,7 +56,7 @@ func card_rows() -> Array:
 			"loader":
 				note = "Feed and crew the guns"
 			"fetcher":
-				note = "Bring scrap home"
+				note = "Rescue survivors, bring scrap"
 			"crafter":
 				note = "Make ammo at a workshop" if G.buildings.count_built("workshop") > 0 else "Needs a workshop"
 		var can_plus := idle > 0

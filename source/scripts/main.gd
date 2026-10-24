@@ -1352,7 +1352,12 @@ func _wave_cleared() -> void:
 	waves_cleared = wave
 	var bonus := wave_bonus()
 	add_supplies(bonus)
-	hud.show_banner("WAVE %d CLEARED" % wave, "+%d supplies" % bonus)
+	var sub := "+%d supplies" % bonus
+	if people.saved_wave > 0:
+		sub += "  ·  %d saved" % people.saved_wave
+	if people.lost_wave > 0:
+		sub += "  ·  %d lost" % people.lost_wave
+	hud.show_banner("WAVE %d CLEARED" % wave, sub)
 	_ui("wave_cleared")
 	logi.on_wave_cleared()
 	wave_cleared.emit(wave)

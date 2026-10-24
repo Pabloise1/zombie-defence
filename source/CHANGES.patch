@@ -131,6 +131,225 @@ diff -ru src_orig/scripts/building.gd src/scripts/building.gd
  func is_wallish() -> bool:
  	return rect
  
+diff -ru src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
+--- a/scripts/buildings/hq.gd	2026-10-24 19:02:37.755353206 +0000
++++ b/scripts/buildings/hq.gd	2026-10-24 20:04:23.514861008 +0000
+@@ -56,7 +56,7 @@
+ 			"loader":
+ 				note = "Feed and crew the guns"
+ 			"fetcher":
+-				note = "Bring scrap home"
++				note = "Rescue survivors, bring scrap"
+ 			"crafter":
+ 				note = "Make ammo at a workshop" if G.buildings.count_built("workshop") > 0 else "Needs a workshop"
+ 		var can_plus := idle > 0
+diff -ru src_orig/scripts/buildings/room_block.gd src/scripts/buildings/room_block.gd
+--- a/scripts/buildings/room_block.gd	2026-10-24 19:02:37.755129078 +0000
++++ b/scripts/buildings/room_block.gd	2026-10-24 20:05:24.250685814 +0000
+@@ -1,9 +1,23 @@
+ class_name RoomBlock
+ extends PrefabBuilding
+ const STOREY := 3.0
++# One gun ledge per storey, at a window, each storey facing a different side:
++# [window position, outward direction] in storey space.
++const LEDGES := [
++	[Vector3(0, 0, -1.82), Vector3(0, 0, -1)],
++	[Vector3(1.82, 0, 0), Vector3(1, 0, 0)],
++	[Vector3(-1.82, 0, 0), Vector3(-1, 0, 0)],
++	[Vector3(-0.85, 0, 1.82), Vector3(0, 0, 1)],
++]
++const LEDGE_OUT := 1.05
++const LEDGE_Y := 1.0
++const ROOF_SLOTS := 2
++static var _ledge_mesh: BoxMesh
++static var _ledge_mat: StandardMaterial3D
+ var storeys := 1
+ var floor_job = null
+ var _cap: Node3D
++var _floor_slots: Array[Node3D] = []
+ 
+ func _make_model() -> void:
+ 	model = Node3D.new()
+@@ -14,6 +28,7 @@
+ func _rebuild_stack() -> void:
+ 	for c in model.get_children():
+ 		c.queue_free()
++	_floor_slots.clear()
+ 	for i in storeys:
+ 		var b := Art.model("room_block")
+ 		b.name = "Storey%d" % (i + 1)
+@@ -22,11 +37,36 @@
+ 		var rs := b.find_child("RoofSlot1", true, false)
+ 		if rs:
+ 			rs.name = "BlockSlot"
++		_floor_slots.append(_make_ledge(b, i))
+ 	_cap = Art.model("room_block_top")
+ 	_cap.name = "Cap"
+ 	_cap.position = Vector3(0, STOREY * storeys, 0)
+ 	model.add_child(_cap)
+ 
++func _make_ledge(storey: Node3D, i: int) -> Node3D:
++	if _ledge_mesh == null:
++		_ledge_mesh = BoxMesh.new()
++		_ledge_mesh.size = Vector3(2.3, 0.22, 2.1)
++		_ledge_mat = StandardMaterial3D.new()
++		_ledge_mat.albedo_color = Color(0.56, 0.55, 0.51)
++		_ledge_mat.roughness = 0.9
++	var l: Array = LEDGES[i % LEDGES.size()]
++	var out: Vector3 = l[1]
++	var at: Vector3 = l[0] + out * LEDGE_OUT
++	var slab := MeshInstance3D.new()
++	slab.name = "Ledge"
++	slab.mesh = _ledge_mesh
++	slab.material_override = _ledge_mat
++	slab.position = Vector3(at.x, LEDGE_Y - 0.11, at.z)
++	slab.rotation.y = atan2(-out.x, -out.z)
++	storey.add_child(slab)
++	var mk := Node3D.new()
++	mk.name = "FloorSlot"
++	mk.position = Vector3(at.x, LEDGE_Y, at.z)
++	mk.rotation.y = atan2(-out.x, -out.z)
++	storey.add_child(mk)
++	return mk
++
+ func roof_height() -> float:
+ 	return STOREY * storeys + 0.1
+ 
+@@ -34,12 +74,27 @@
+ 	return STOREY * (storeys - 1) + 3.83 + 0.37
+ 
+ func _slot_marker(i: int) -> Node3D:
++	if i >= ROOF_SLOTS:
++		var k := i - ROOF_SLOTS
++		return _floor_slots[k] if k < _floor_slots.size() else null
+ 	if _cap == null:
+ 		return null
+ 	return _cap.find_child("RoofSlot%d" % (i + 1), true, false) as Node3D
+ 
+ func slot_count() -> int:
+-	return 2
++	return ROOF_SLOTS + storeys
++
++func _grow_slots() -> void:
++	while mounted.size() < slot_count():
++		mounted.append(null)
++
++func _take_over(old) -> void:
++	if old is RoomBlock and old.storeys != storeys:
++		storeys = old.storeys
++		max_hp = float(def.get("hp", 3000.0)) * storeys
++		_rebuild_stack()
++		_grow_slots()
++	super._take_over(old)
+ 
+ func capacity() -> int:
+ 	return 4 * storeys
+@@ -118,6 +173,7 @@
+ 	hp = max_hp * frac + float(def.get("hp", 3000.0))
+ 	hp = minf(hp, max_hp)
+ 	_rebuild_stack()
++	_grow_slots()
+ 	for i in mounted.size():
+ 		var g = mounted[i]
+ 		if g != null and is_instance_valid(g):
+@@ -151,6 +207,11 @@
+ 	if not incoming.is_empty():
+ 		s += "  (+%d coming)" % incoming.size()
+ 	out.append(s)
++	var free := 0
++	for i in mounted.size():
++		if mounted[i] == null or not is_instance_valid(mounted[i]):
++			free += 1
++	out.append("Gun slots %d free of %d  ·  2 on the roof, 1 on each floor" % [free, mounted.size()])
+ 	if floor_job != null and is_instance_valid(floor_job):
+ 		out.append("Building storey %d: %d%%" % [storeys + 1, int(floor_job.progress * 100.0)])
+ 	return out
+diff -ru src_orig/scripts/civilian.gd src/scripts/civilian.gd
+--- a/scripts/civilian.gd	2026-10-24 19:02:37.755483804 +0000
++++ b/scripts/civilian.gd	2026-10-24 20:03:49.628893333 +0000
+@@ -1,6 +1,6 @@
+ class_name Civilian
+ extends Person
+-enum {ARRIVING, IDLE}
++enum {ARRIVING, IDLE, SHELTER}
+ var mode := ARRIVING
+ var owned := false
+ var home := Vector3.ZERO
+@@ -11,6 +11,9 @@
+ var waiting := false
+ var boarding := false
+ var _board_to := Vector3.INF
++var shelter = null
++var _houses := true
++var _counted := false
+ 
+ func setup(at: Vector3, owned_now: bool) -> void:
+ 	kind = "civilian"
+@@ -28,7 +31,7 @@
+ 		_plan_refuge()
+ 
+ func _plan_refuge() -> void:
+-	var goals: Dictionary = G.people.refuge_goals(position)
++	var goals: Dictionary = G.people.refuge_goals(position, _houses)
+ 	if not walk_to_avoiding(goals):
+ 		walk_to_goals(goals)
+ 
+@@ -41,6 +44,12 @@
+ 		step_dead(dt)
+ 		return
+ 	_moving = false
++	if mode == SHELTER:
++		if shelter == null or not is_instance_valid(shelter) or shelter.state != Building.BUILT or not shelter.claimed:
++			if G.hud:
++				G.hud.toast("A safe house fell! Survivors are running for the base")
++			leave_shelter()
++		return
+ 	if mode == ARRIVING and (waiting or boarding):
+ 		_stranded_step(dt)
+ 		settle(dt)
+@@ -54,6 +63,8 @@
+ 			follow(dt, 4.6)
+ 		if G.people.is_safe(position):
+ 			_join()
++		elif _houses and G.people.shelter_at(position) != null:
++			_take_shelter(G.people.shelter_at(position))
+ 		else:
+ 			_retry -= dt
+ 			if _retry <= 0.0:
+@@ -112,7 +123,32 @@
+ func _join() -> void:
+ 	owned = true
+ 	mode = IDLE
++	_houses = true
+ 	stop()
+ 	home = G.people.home_spot(self)
+ 	walk_to(home, 1)
+-	G.people.on_joined(self)
++	if not _counted:
++		_counted = true
++		G.people.on_joined(self)
++
++# Hide in a safe house until the wave is over (or the house falls).
++func _take_shelter(h) -> void:
++	shelter = h
++	mode = SHELTER
++	owned = true
++	stop()
++	visible = false
++	if not _counted:
++		_counted = true
++		G.people.on_joined(self)
++
++func leave_shelter() -> void:
++	if shelter != null and is_instance_valid(shelter):
++		var e: Vector3 = shelter.entry_point()
++		position = Vector3(e.x, 0, e.z)
++	shelter = null
++	visible = true
++	mode = ARRIVING
++	_houses = false
++	waiting = false
++	_plan_refuge()
 diff -ru src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
 +++ b/scripts/defs.gd	2026-10-24 19:14:31.154073723 +0000
@@ -151,6 +370,122 @@ diff -ru src_orig/scripts/defs.gd src/scripts/defs.gd
  const Z_HP_GROWTH := 0.38
  const Z_HP_LATE := 0.05
  const Z_HP := [33.0, 23.0, 330.0]
+diff -ru src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
+--- a/scripts/fetcher.gd	2026-10-24 19:02:37.756064080 +0000
++++ b/scripts/fetcher.gd	2026-10-24 20:04:23.514436284 +0000
+@@ -1,6 +1,6 @@
+ class_name Fetcher
+ extends Person
+-enum {IDLE, GO, SEARCH, CARRY, FLEE}
++enum {IDLE, GO, SEARCH, CARRY, FLEE, RESCUE, LEAD}
+ var mode := IDLE
+ var spot = null
+ var carrying := 0
+@@ -8,6 +8,7 @@
+ var _t := 0.0
+ var _bundle: Node3D
+ var _think := 0.0
++var group = null
+ 
+ func setup(at: Vector3) -> void:
+ 	kind = "fetcher"
+@@ -34,11 +35,17 @@
+ 		spot.fetchers = maxi(0, spot.fetchers - 1)
+ 	spot = null
+ 
++func _drop_group() -> void:
++	if group != null and group.rescuer == self:
++		group.rescuer = null
++	group = null
++
+ func _on_death() -> void:
+ 	_leave_spot()
++	_drop_group()
+ 
+ func is_out() -> bool:
+-	return mode == GO or mode == SEARCH or mode == CARRY or (mode == FLEE and not G.people.is_safe(position))
++	return mode == GO or mode == SEARCH or mode == CARRY or mode == RESCUE or mode == LEAD or (mode == FLEE and not G.people.is_safe(position))
+ 
+ func step(dt: float) -> void:
+ 	if dead:
+@@ -46,6 +53,7 @@
+ 		return
+ 	_moving = false
+ 	var building: bool = G.main != null and G.main.phase == "build"
++	var active: bool = building or (G.main != null and G.main.phase == "wave")
+ 	if not building and (mode == GO or mode == SEARCH or mode == CARRY):
+ 		_leave_spot()
+ 		mode = FLEE
+@@ -58,6 +66,13 @@
+ 				home = G.people.home_spot(self)
+ 			if not walk_to_avoiding(G.grid.point_goals(home, 1)):
+ 				_go_home()
++	elif mode == RESCUE or mode == LEAD:
++		# Braver than on a scrap run: only a zombie right on top turns them back.
++		if scan_threat(dt, 5.0):
++			_drop_group()
++			mode = FLEE
++			if not walk_to_avoiding(G.people.refuge_goals(position)):
++				_go_home()
+ 	elif alert_t > 0.0:
+ 		scan_threat(dt, 12.0)
+ 	match mode:
+@@ -65,8 +80,16 @@
+ 			if not arrived():
+ 				follow(dt)
+ 			_think -= dt
+-			if building and _think <= 0.0:
++			if active and _think <= 0.0:
+ 				_think = 1.0
++				var g = G.people.group_to_rescue(position)
++				if g != null and walk_to_avoiding(G.grid.point_goals(g.pos, 2)):
++					group = g
++					g.rescuer = self
++					mode = RESCUE
++					if G.hud:
++						G.hud.toast("A fetcher is running out for the survivors")
++			if building and _think <= 0.0:
+ 				var s = G.logi.pick_salvage(position) if G.logi else null
+ 				if s != null:
+ 					var goals: Dictionary = s.goals()
+@@ -111,6 +134,28 @@
+ 				_bundle.visible = false
+ 				mode = IDLE
+ 				_think = 0.5
++		RESCUE:
++			if group == null or group.members.is_empty() or group.heli != null:
++				_drop_group()
++				mode = IDLE
++				_go_home()
++			elif position.distance_to(group.pos) < 3.5 or arrived():
++				var n: int = G.people.release_group(group)
++				group = null
++				mode = LEAD
++				if not walk_to_avoiding(G.people.refuge_goals(position, true)):
++					walk_to_goals(G.people.refuge_goals(position, true))
++				if G.hud and n > 0:
++					G.hud.toast("Fetcher reached %d survivor%s. Cover them on the way in!" % [n, "" if n == 1 else "s"])
++			else:
++				follow(dt, 4.6)
++		LEAD:
++			if G.people.is_safe(position) or arrived():
++				mode = IDLE
++				_think = 2.0
++				_go_home()
++			else:
++				follow(dt, 4.2)
+ 		FLEE:
+ 			_bundle.visible = false
+ 			carrying = 0
+@@ -122,7 +167,7 @@
+ 		anim_mode = "work"
+ 	elif mode == CARRY:
+ 		anim_mode = "carry"
+-	elif mode == FLEE:
++	elif mode == FLEE or mode == RESCUE or mode == LEAD:
+ 		anim_mode = "run"
+ 	else:
+ 		anim_mode = "idle"
 diff -ru src_orig/scripts/logistics.gd src/scripts/logistics.gd
 --- a/scripts/logistics.gd	2026-10-24 19:02:37.755636605 +0000
 +++ b/scripts/logistics.gd	2026-10-24 19:07:05.109941219 +0000
@@ -191,7 +526,7 @@ diff -ru src_orig/scripts/logistics.gd src/scripts/logistics.gd
  	var bd := INF
 diff -ru src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-24 19:11:47.960219608 +0000
++++ b/scripts/main.gd	2026-10-24 20:04:39.078278265 +0000
 @@ -26,6 +26,7 @@
  var phase := "title"
  var phase_t := 0.0
@@ -238,7 +573,21 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  				break
  			var kind: int = _queue.pop_back()
  			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
-@@ -1354,6 +1360,8 @@
+@@ -1346,7 +1352,12 @@
+ 	waves_cleared = wave
+ 	var bonus := wave_bonus()
+ 	add_supplies(bonus)
+-	hud.show_banner("WAVE %d CLEARED" % wave, "+%d supplies" % bonus)
++	var sub := "+%d supplies" % bonus
++	if people.saved_wave > 0:
++		sub += "  ·  %d saved" % people.saved_wave
++	if people.lost_wave > 0:
++		sub += "  ·  %d lost" % people.lost_wave
++	hud.show_banner("WAVE %d CLEARED" % wave, sub)
+ 	_ui("wave_cleared")
+ 	logi.on_wave_cleared()
+ 	wave_cleared.emit(wave)
+@@ -1354,6 +1365,8 @@
  	phase = "build"
  	phase_t = Defs.BUILD_PHASE_TIME
  	_plan_edges()
@@ -247,6 +596,266 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  	for t in Defs.TOOLS:
  		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
  			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
+diff -ru src_orig/scripts/maps/map_building.gd src/scripts/maps/map_building.gd
+--- a/scripts/maps/map_building.gd	2026-10-24 19:02:37.756348142 +0000
++++ b/scripts/maps/map_building.gd	2026-10-24 20:04:31.766090598 +0000
+@@ -194,6 +194,7 @@
+ 			out.append("Being secured  %d%%" % int(progress * 100.0))
+ 		else:
+ 			out.append("Not yours. Claim it: workers secure it (~%ds)" % int(def.get("claim_time", 18.0)))
++			out.append("Safe house: survivors out here hide in it till the wave ends")
+ 			out.append("Might hide survivors or supplies")
+ 		if kind == "petrol_station" and not exploded:
+ 			out.append("Pumps: a shell or blast there sets them off. Big explosion")
+@@ -201,6 +202,8 @@
+ 			out.append("Burnt out")
+ 		return out
+ 	out = super.card_lines()
++	var n: int = G.people.sheltered_in(self) if G.people else 0
++	out.insert(0, "Safe house  ·  sheltering %d/%d  ·  draws survivors" % [n, G.people.shelter_cap(self) if G.people else 0])
+ 	if kind == "petrol_station" and not exploded:
+ 		out.append("Careful: hits on the pumps blow it up")
+ 	return out
+diff -ru src_orig/scripts/people_manager.gd src/scripts/people_manager.gd
+--- a/scripts/people_manager.gd	2026-10-24 19:02:37.755436549 +0000
++++ b/scripts/people_manager.gd	2026-10-24 20:34:02.755230884 +0000
+@@ -18,6 +18,10 @@
+ var _straggle_t := -1.0
+ var _last_phase := ""
+ var groups: Array = []
++var _sos_left := 0
++var _sos_t := 0.0
++var saved_wave := 0
++var lost_wave := 0
+ 
+ class StrandedGroup:
+ 	extends RefCounted
+@@ -25,6 +29,7 @@
+ 	var members: Array = []
+ 	var marker: Label3D
+ 	var heli = null
++	var rescuer = null
+ 	var t := 0.0
+ 	func call_to(p: Vector3) -> void:
+ 		for c in members:
+@@ -97,8 +102,10 @@
+ 	return n
+ 
+ func add_job(job: String) -> String:
+-	var idle := owned_civilians()
++	var idle := owned_civilians().filter(func(c): return c.mode == Civilian.IDLE and c.visible)
+ 	if idle.is_empty():
++		if not owned_civilians().is_empty():
++			return "Your idle people are still on their way in"
+ 		return "No idle people. Bring survivors in"
+ 	var arm: int = G.logi.soldier_cost() if G.logi else Defs.SOLDIER_ARM_COST
+ 	if job == "soldier" and not G.main.spend(arm):
+@@ -253,6 +260,35 @@
+ 			best = g
+ 	return best
+ 
++func group_to_rescue(from: Vector3):
++	var best = null
++	var bd := INF
++	for g in groups:
++		if g.members.is_empty() or g.heli != null:
++			continue
++		if g.rescuer != null and is_instance_valid(g.rescuer) and not g.rescuer.dead:
++			continue
++		if G.zombies and G.zombies.count_near(g.pos, 10.0) > 3:
++			continue
++		var d: float = g.pos.distance_to(from)
++		if d < bd:
++			bd = d
++			best = g
++	return best
++
++# A fetcher reached them: everyone gets up and runs for the nearest shelter.
++func release_group(g) -> int:
++	var n := 0
++	for c in g.members:
++		if is_instance_valid(c) and not c.dead:
++			c.waiting = false
++			c.boarding = false
++			c._plan_refuge()
++			n += 1
++	g.members.clear()
++	remove_group(g)
++	return n
++
+ func leave_group(c) -> void:
+ 	for g in groups:
+ 		g.members.erase(c)
+@@ -271,10 +307,11 @@
+ 		if g.members.is_empty() and g.heli == null:
+ 			remove_group(g)
+ 			continue
++		var coming: bool = g.heli != null or (g.rescuer != null and is_instance_valid(g.rescuer) and not g.rescuer.dead)
+ 		if g.marker:
+-			g.marker.text = "SOS  %d" % g.members.size() if g.heli == null else "HELP COMING"
++			g.marker.text = "SOS  %d" % g.members.size() if not coming else "HELP COMING"
+ 			g.marker.visible = not g.members.is_empty()
+-		if g.t > 200.0 and g.heli == null:
++		if g.t > 120.0 and not coming:
+ 			for c in g.members:
+ 				if is_instance_valid(c):
+ 					c.waiting = false
+@@ -291,6 +328,7 @@
+ 
+ func on_joined(c) -> void:
+ 	joined_recent += 1
++	saved_wave += 1
+ 	_join_t = 1.2
+ 	changed.emit()
+ 
+@@ -303,8 +341,10 @@
+ 		G.workers.workers.erase(p)
+ 	if p is Soldier:
+ 		G.soldiers.on_dead(p)
+-	if G.hud and p is Civilian and not p.owned:
+-		G.hud.toast("A survivor was caught")
++	if p is Civilian and (not p.owned or p.mode != Civilian.IDLE):
++		lost_wave += 1
++		if G.hud:
++			G.hud.toast("A survivor was caught")
+ 	changed.emit()
+ 
+ func on_building_removed(b) -> void:
+@@ -353,10 +393,67 @@
+ 				return true
+ 	return false
+ 
+-func refuge_goals(from: Vector3) -> Dictionary:
++func safe_houses() -> Array:
++	var out := []
++	if G.map:
++		for mb in G.map.buildings:
++			if is_instance_valid(mb) and mb.claimed and mb.state == Building.BUILT:
++				out.append(mb)
++	return out
++
++func shelter_cap(h) -> int:
++	return int(h.def.get("pop", 1)) + 2
++
++func sheltered_in(h) -> int:
++	var n := 0
++	for c in civilians:
++		if not c.dead and c.shelter == h:
++			n += 1
++	return n
++
++func _house_open(h) -> bool:
++	return sheltered_in(h) < shelter_cap(h) and (G.zombies == null or G.zombies.count_near(h.entry_point(), 5.0) == 0)
++
++# Safe houses only take people in while a wave is on; between waves the
++# base is the place to be.
++func _sheltering() -> bool:
++	return G.main != null and G.main.phase == "wave"
++
++func shelter_at(p: Vector3):
++	if not _sheltering():
++		return null
++	for h in safe_houses():
++		var e: Vector3 = h.entry_point()
++		if Vector2(e.x - p.x, e.z - p.z).length() < 2.2 and _house_open(h):
++			return h
++	return null
++
++func refuge_goals(from: Vector3, houses: bool = false) -> Dictionary:
+ 	var g: Grid = G.grid
+ 	var best = null
+ 	var bd := INF
++	if houses and _sheltering() and G.zones and G.zones.zone_at(from) == 0:
++		var hb = null
++		var hd := INF
++		for h in safe_houses():
++			if not _house_open(h):
++				continue
++			var d0: float = h.entry_point().distance_squared_to(from)
++			if d0 < hd:
++				hd = d0
++				hb = h
++		if hb != null:
++			var gate_d := INF
++			if G.walls:
++				for s in G.walls.live():
++					if s.kind == "gate" and s.state == Building.BUILT and _gate_zone(s) > 0:
++						gate_d = minf(gate_d, s.position.distance_squared_to(from))
++			if hq_zone() == 0:
++				gate_d = minf(gate_d, Defs.hq_center().distance_squared_to(from))
++			if hd < gate_d:
++				var hg: Dictionary = g.point_goals(hb.entry_point(), 1)
++				if not hg.is_empty():
++					return hg
+ 	if G.walls:
+ 		for s in G.walls.live():
+ 			if s.kind == "gate" and s.state == Building.BUILT:
+@@ -588,13 +685,10 @@
+ 	_arrivals(dt)
+ 	_step_groups(dt)
+ 
+-func _stranded_ok() -> bool:
+-	if G.helis == null:
+-		return false
+-	for h in G.helis.list:
+-		if is_instance_valid(h):
+-			return true
+-	return false
++func _rescue_hint() -> String:
++	if fetchers.is_empty():
++		return "Give people the Fetcher job to rescue them"
++	return "Fetchers will run out for them"
+ 
+ func _arrivals(dt: float) -> void:
+ 	if G.main == null or (G.main.test_mode and not arrivals_in_tests) or ruins.is_empty():
+@@ -608,9 +702,17 @@
+ 			_groups_left = 1 + (1 if randf() < 0.6 else 0) + G.main.wave / 4
+ 			if G.logi:
+ 				_groups_left += G.logi.radio_count() * Defs.RADIO_GROUPS
++			_groups_left += mini(2, safe_houses().size())
+ 			_group_t = randf_range(4.0, 12.0)
++			for c in civilians:
++				if not c.dead and c.shelter != null:
++					c.leave_shelter()
+ 		elif ph == "wave":
+ 			_straggle_t = randf_range(15.0, 35.0)
++			_sos_left = 1 + G.main.wave / 3
++			_sos_t = randf_range(20.0, 35.0)
++			saved_wave = 0
++			lost_wave = 0
+ 	if room() <= 0:
+ 		return
+ 	if ph == "build" and _groups_left > 0:
+@@ -620,15 +722,26 @@
+ 			_group_t = randf_range(10.0, 16.0)
+ 			var r: Vector3 = ruins[randi() % ruins.size()]
+ 			var big := mini(randi_range(2, 6) + G.main.wave / 3, room())
+-			if _stranded_ok() and randf() < 0.5 and r.distance_to(Defs.hq_center()) > 40.0:
++			if randf() < 0.5 and r.distance_to(Defs.hq_center()) > 40.0:
+ 				spawn_stranded(r, big)
+ 				if G.hud:
+-					G.hud.toast("SOS: survivors stuck to the %s. Send a helicopter" % _dir_name(r))
++					G.hud.toast("SOS: survivors stuck to the %s. %s" % [_dir_name(r), _rescue_hint()])
+ 			else:
+ 				spawn_group(r, big)
+ 				if G.hud:
+ 					G.hud.toast("Survivors coming from the %s" % _dir_name(r))
+-	elif ph == "wave" and _straggle_t > 0.0:
++	if ph == "wave" and _sos_left > 0:
++		_sos_t -= dt
++		if _sos_t <= 0.0:
++			_sos_left -= 1
++			_sos_t = randf_range(25.0, 45.0)
++			var far: Array = ruins.filter(func(q): return q.distance_to(Defs.hq_center()) > 35.0)
++			if not far.is_empty():
++				var r3: Vector3 = far[randi() % far.size()]
++				spawn_stranded(r3, mini(randi_range(2, 4) + G.main.wave / 4, room()))
++				if G.hud:
++					G.hud.toast("SOS to the %s! %s" % [_dir_name(r3), _rescue_hint()])
++	if ph == "wave" and _straggle_t > 0.0:
+ 		_straggle_t -= dt
+ 		if _straggle_t <= 0.0:
+ 			var r2: Vector3 = ruins[randi() % ruins.size()]
 diff -ru src_orig/scripts/quality.gd src/scripts/quality.gd
 --- a/scripts/quality.gd	2026-10-24 19:02:37.756425757 +0000
 +++ b/scripts/quality.gd	2026-10-24 19:27:03.401648103 +0000

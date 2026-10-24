@@ -28,6 +28,7 @@ in `index.service.worker.js`, so installed copies download the new pack.
 - `tools/repack.py`: put text scripts back into a `.pck`.
 - `tools/loadall.gd`: compile-check every script against a pack (run with Godot `--headless -s`, `LIST=` a file of `res://` paths).
 - `tools/audit.gd`: plays waves headless with the real economy and prints ammo, crates, income and repairs per wave (`LAYOUT=square|mixed`).
+- `tools/civtest.gd`: scenario checks for fetcher rescues, safe houses and room block gun slots (`TEST=rescue|shelter|block`; shelter needs `-- --map=suburb`).
 - `tools/soak.gd`: long headless run that prints object, node and memory counts per wave, to catch leaks.
 
 Example: `LAYOUT=square ./Godot_v4.7.2-stable_linux.x86_64 --headless --main-pack index.pck -s source/tools/audit.gd`

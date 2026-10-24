@@ -1,6 +1,6 @@
 class_name Civilian
 extends Person
-enum {ARRIVING, IDLE}
+enum {ARRIVING, IDLE, SHELTER}
 var mode := ARRIVING
 var owned := false
 var home := Vector3.ZERO
@@ -11,6 +11,9 @@ var _last := Vector3.ZERO
 var waiting := false
 var boarding := false
 var _board_to := Vector3.INF
+var shelter = null
+var _houses := true
+var _counted := false
 
 func setup(at: Vector3, owned_now: bool) -> void:
 	kind = "civilian"
@@ -28,7 +31,7 @@ func setup(at: Vector3, owned_now: bool) -> void:
 		_plan_refuge()
 
 func _plan_refuge() -> void:
-	var goals: Dictionary = G.people.refuge_goals(position)
+	var goals: Dictionary = G.people.refuge_goals(position, _houses)
 	if not walk_to_avoiding(goals):
 		walk_to_goals(goals)
 
@@ -41,6 +44,12 @@ func step(dt: float) -> void:
 		step_dead(dt)
 		return
 	_moving = false
+	if mode == SHELTER:
+		if shelter == null or not is_instance_valid(shelter) or shelter.state != Building.BUILT or not shelter.claimed:
+			if G.hud:
+				G.hud.toast("A safe house fell! Survivors are running for the base")
+			leave_shelter()
+		return
 	if mode == ARRIVING and (waiting or boarding):
 		_stranded_step(dt)
 		settle(dt)
@@ -54,6 +63,8 @@ func step(dt: float) -> void:
 			follow(dt, 4.6)
 		if G.people.is_safe(position):
 			_join()
+		elif _houses and G.people.shelter_at(position) != null:
+			_take_shelter(G.people.shelter_at(position))
 		else:
 			_retry -= dt
 			if _retry <= 0.0:
@@ -112,7 +123,32 @@ func board_at(p: Vector3) -> void:
 func _join() -> void:
 	owned = true
 	mode = IDLE
+	_houses = true
 	stop()
 	home = G.people.home_spot(self)
 	walk_to(home, 1)
-	G.people.on_joined(self)
+	if not _counted:
+		_counted = true
+		G.people.on_joined(self)
+
+# Hide in a safe house until the wave is over (or the house falls).
+func _take_shelter(h) -> void:
+	shelter = h
+	mode = SHELTER
+	owned = true
+	stop()
+	visible = false
+	if not _counted:
+		_counted = true
+		G.people.on_joined(self)
+
+func leave_shelter() -> void:
+	if shelter != null and is_instance_valid(shelter):
+		var e: Vector3 = shelter.entry_point()
+		position = Vector3(e.x, 0, e.z)
+	shelter = null
+	visible = true
+	mode = ARRIVING
+	_houses = false
+	waiting = false
+	_plan_refuge()

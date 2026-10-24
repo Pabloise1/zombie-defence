@@ -18,6 +18,10 @@ var _groups_left := 0
 var _straggle_t := -1.0
 var _last_phase := ""
 var groups: Array = []
+var _sos_left := 0
+var _sos_t := 0.0
+var saved_wave := 0
+var lost_wave := 0
 
 class StrandedGroup:
 	extends RefCounted
@@ -25,6 +29,7 @@ class StrandedGroup:
 	var members: Array = []
 	var marker: Label3D
 	var heli = null
+	var rescuer = null
 	var t := 0.0
 	func call_to(p: Vector3) -> void:
 		for c in members:
@@ -97,8 +102,10 @@ func crafters_at(b) -> int:
 	return n
 
 func add_job(job: String) -> String:
-	var idle := owned_civilians()
+	var idle := owned_civilians().filter(func(c): return c.mode == Civilian.IDLE and c.visible)
 	if idle.is_empty():
+		if not owned_civilians().is_empty():
+			return "Your idle people are still on their way in"
 		return "No idle people. Bring survivors in"
 	var arm: int = G.logi.soldier_cost() if G.logi else Defs.SOLDIER_ARM_COST
 	if job == "soldier" and not G.main.spend(arm):
@@ -253,6 +260,35 @@ func group_near(p: Vector3, r: float):
 			best = g
 	return best
 
+func group_to_rescue(from: Vector3):
+	var best = null
+	var bd := INF
+	for g in groups:
+		if g.members.is_empty() or g.heli != null:
+			continue
+		if g.rescuer != null and is_instance_valid(g.rescuer) and not g.rescuer.dead:
+			continue
+		if G.zombies and G.zombies.count_near(g.pos, 10.0) > 3:
+			continue
+		var d: float = g.pos.distance_to(from)
+		if d < bd:
+			bd = d
+			best = g
+	return best
+
+# A fetcher reached them: everyone gets up and runs for the nearest shelter.
+func release_group(g) -> int:
+	var n := 0
+	for c in g.members:
+		if is_instance_valid(c) and not c.dead:
+			c.waiting = false
+			c.boarding = false
+			c._plan_refuge()
+			n += 1
+	g.members.clear()
+	remove_group(g)
+	return n
+
 func leave_group(c) -> void:
 	for g in groups:
 		g.members.erase(c)
@@ -271,10 +307,11 @@ func _step_groups(dt: float) -> void:
 		if g.members.is_empty() and g.heli == null:
 			remove_group(g)
 			continue
+		var coming: bool = g.heli != null or (g.rescuer != null and is_instance_valid(g.rescuer) and not g.rescuer.dead)
 		if g.marker:
-			g.marker.text = "SOS  %d" % g.members.size() if g.heli == null else "HELP COMING"
+			g.marker.text = "SOS  %d" % g.members.size() if not coming else "HELP COMING"
 			g.marker.visible = not g.members.is_empty()
-		if g.t > 200.0 and g.heli == null:
+		if g.t > 120.0 and not coming:
 			for c in g.members:
 				if is_instance_valid(c):
 					c.waiting = false
@@ -291,6 +328,7 @@ func setup_start() -> void:
 
 func on_joined(c) -> void:
 	joined_recent += 1
+	saved_wave += 1
 	_join_t = 1.2
 	changed.emit()
 
@@ -303,8 +341,10 @@ func on_dead(p) -> void:
 		G.workers.workers.erase(p)
 	if p is Soldier:
 		G.soldiers.on_dead(p)
-	if G.hud and p is Civilian and not p.owned:
-		G.hud.toast("A survivor was caught")
+	if p is Civilian and (not p.owned or p.mode != Civilian.IDLE):
+		lost_wave += 1
+		if G.hud:
+			G.hud.toast("A survivor was caught")
 	changed.emit()
 
 func on_building_removed(b) -> void:
@@ -353,10 +393,67 @@ func _near_gate(n: Vector2i) -> bool:
 				return true
 	return false
 
-func refuge_goals(from: Vector3) -> Dictionary:
+func safe_houses() -> Array:
+	var out := []
+	if G.map:
+		for mb in G.map.buildings:
+			if is_instance_valid(mb) and mb.claimed and mb.state == Building.BUILT:
+				out.append(mb)
+	return out
+
+func shelter_cap(h) -> int:
+	return int(h.def.get("pop", 1)) + 2
+
+func sheltered_in(h) -> int:
+	var n := 0
+	for c in civilians:
+		if not c.dead and c.shelter == h:
+			n += 1
+	return n
+
+func _house_open(h) -> bool:
+	return sheltered_in(h) < shelter_cap(h) and (G.zombies == null or G.zombies.count_near(h.entry_point(), 5.0) == 0)
+
+# Safe houses only take people in while a wave is on; between waves the
+# base is the place to be.
+func _sheltering() -> bool:
+	return G.main != null and G.main.phase == "wave"
+
+func shelter_at(p: Vector3):
+	if not _sheltering():
+		return null
+	for h in safe_houses():
+		var e: Vector3 = h.entry_point()
+		if Vector2(e.x - p.x, e.z - p.z).length() < 2.2 and _house_open(h):
+			return h
+	return null
+
+func refuge_goals(from: Vector3, houses: bool = false) -> Dictionary:
 	var g: Grid = G.grid
 	var best = null
 	var bd := INF
+	if houses and _sheltering() and G.zones and G.zones.zone_at(from) == 0:
+		var hb = null
+		var hd := INF
+		for h in safe_houses():
+			if not _house_open(h):
+				continue
+			var d0: float = h.entry_point().distance_squared_to(from)
+			if d0 < hd:
+				hd = d0
+				hb = h
+		if hb != null:
+			var gate_d := INF
+			if G.walls:
+				for s in G.walls.live():
+					if s.kind == "gate" and s.state == Building.BUILT and _gate_zone(s) > 0:
+						gate_d = minf(gate_d, s.position.distance_squared_to(from))
+			if hq_zone() == 0:
+				gate_d = minf(gate_d, Defs.hq_center().distance_squared_to(from))
+			if hd < gate_d:
+				var hg: Dictionary = g.point_goals(hb.entry_point(), 1)
+				if not hg.is_empty():
+					return hg
 	if G.walls:
 		for s in G.walls.live():
 			if s.kind == "gate" and s.state == Building.BUILT:
@@ -588,13 +685,10 @@ func step(dt: float) -> void:
 	_arrivals(dt)
 	_step_groups(dt)
 
-func _stranded_ok() -> bool:
-	if G.helis == null:
-		return false
-	for h in G.helis.list:
-		if is_instance_valid(h):
-			return true
-	return false
+func _rescue_hint() -> String:
+	if fetchers.is_empty():
+		return "Give people the Fetcher job to rescue them"
+	return "Fetchers will run out for them"
 
 func _arrivals(dt: float) -> void:
 	if G.main == null or (G.main.test_mode and not arrivals_in_tests) or ruins.is_empty():
@@ -608,9 +702,17 @@ func _arrivals(dt: float) -> void:
 			_groups_left = 1 + (1 if randf() < 0.6 else 0) + G.main.wave / 4
 			if G.logi:
 				_groups_left += G.logi.radio_count() * Defs.RADIO_GROUPS
+			_groups_left += mini(2, safe_houses().size())
 			_group_t = randf_range(4.0, 12.0)
+			for c in civilians:
+				if not c.dead and c.shelter != null:
+					c.leave_shelter()
 		elif ph == "wave":
 			_straggle_t = randf_range(15.0, 35.0)
+			_sos_left = 1 + G.main.wave / 3
+			_sos_t = randf_range(20.0, 35.0)
+			saved_wave = 0
+			lost_wave = 0
 	if room() <= 0:
 		return
 	if ph == "build" and _groups_left > 0:
@@ -620,15 +722,26 @@ func _arrivals(dt: float) -> void:
 			_group_t = randf_range(10.0, 16.0)
 			var r: Vector3 = ruins[randi() % ruins.size()]
 			var big := mini(randi_range(2, 6) + G.main.wave / 3, room())
-			if _stranded_ok() and randf() < 0.5 and r.distance_to(Defs.hq_center()) > 40.0:
+			if randf() < 0.5 and r.distance_to(Defs.hq_center()) > 40.0:
 				spawn_stranded(r, big)
 				if G.hud:
-					G.hud.toast("SOS: survivors stuck to the %s. Send a helicopter" % _dir_name(r))
+					G.hud.toast("SOS: survivors stuck to the %s. %s" % [_dir_name(r), _rescue_hint()])
 			else:
 				spawn_group(r, big)
 				if G.hud:
 					G.hud.toast("Survivors coming from the %s" % _dir_name(r))
-	elif ph == "wave" and _straggle_t > 0.0:
+	if ph == "wave" and _sos_left > 0:
+		_sos_t -= dt
+		if _sos_t <= 0.0:
+			_sos_left -= 1
+			_sos_t = randf_range(25.0, 45.0)
+			var far: Array = ruins.filter(func(q): return q.distance_to(Defs.hq_center()) > 35.0)
+			if not far.is_empty():
+				var r3: Vector3 = far[randi() % far.size()]
+				spawn_stranded(r3, mini(randi_range(2, 4) + G.main.wave / 4, room()))
+				if G.hud:
+					G.hud.toast("SOS to the %s! %s" % [_dir_name(r3), _rescue_hint()])
+	if ph == "wave" and _straggle_t > 0.0:
 		_straggle_t -= dt
 		if _straggle_t <= 0.0:
 			var r2: Vector3 = ruins[randi() % ruins.size()]
