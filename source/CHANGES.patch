@@ -1,0 +1,511 @@
+diff -ru src_orig/scripts/building.gd src/scripts/building.gd
+--- a/scripts/building.gd	2026-10-24 19:02:37.754757495 +0000
++++ b/scripts/building.gd	2026-10-24 19:11:47.959085698 +0000
+@@ -22,6 +22,8 @@
+ var reserve := 0
+ var reserve_max := 0
+ var reload_t := 0.0
++var _feed_t := 0.0
++var _repair_debt := 0.0
+ var occupants: Array = []
+ var incoming: Array = []
+ var _pop := 0.0
+@@ -446,7 +448,9 @@
+ 	return true
+ 
+ func _start_reload() -> void:
+-	if zone > 0 or reserve > 0:
++	if reserve <= 0:
++		_zone_feed()
++	if reserve > 0:
+ 		reload_t = float(def.get("reload", 3.0))
+ 		if G.sfx:
+ 			G.sfx.play("reload", position)
+@@ -454,13 +458,29 @@
+ 		if G.sfx:
+ 			G.sfx.play("no_ammo", position)
+ 		if G.hud and G.main and not G.main.test_mode:
+-			G.hud.event("ammo", "%s out of ammo! Loaders need crates" % display_name(), 12.0)
++			if zone > 0:
++				G.hud.event("ammo", "%s out of ammo! No crates in the zone: build a Workshop and add Crafters" % display_name(), 12.0)
++			else:
++				G.hud.event("ammo", "%s out of ammo! Loaders need crates" % display_name(), 12.0)
+ 
+ func out_of_ammo() -> bool:
+-	return mag_size > 0 and mag <= 0 and reload_t <= 0.0 and zone == 0 and reserve <= 0
++	return mag_size > 0 and mag <= 0 and reload_t <= 0.0 and reserve <= 0
+ 
+ func needs_restock() -> bool:
+-	return mag_size > 0 and state == BUILT and zone == 0 and reserve < reserve_max * 0.6
++	if mag_size <= 0 or state != BUILT or reserve >= reserve_max * 0.6:
++		return false
++	return zone == 0 or G.logi == null or not G.logi.zone_has_crates(zone)
++
++# Inside a sealed zone the supply line is safe: a gun pulls a crate from a
++# store in the same zone by itself when its spare ammo gets low.
++func _zone_feed() -> bool:
++	if zone <= 0 or state != BUILT or G.logi == null:
++		return false
++	if not G.logi.take_zone_crate(zone):
++		return false
++	reserve = reserve_max
++	G.logi.zone_fed += 1
++	return true
+ 
+ func restock() -> void:
+ 	reserve = reserve_max
+@@ -470,14 +490,17 @@
+ func ammo_tick(dt: float) -> void:
+ 	if mag_size <= 0:
+ 		return
++	if zone > 0 and reserve < mag_size:
++		_feed_t -= dt
++		if _feed_t <= 0.0:
++			_feed_t = 1.0
++			_zone_feed()
+ 	if reload_t > 0.0:
+ 		reload_t -= dt * loader_boost()
+ 		if reload_t <= 0.0:
+ 			reload_t = 0.0
+-			var take := mag_size
+-			if zone == 0:
+-				take = mini(mag_size, reserve)
+-				reserve -= take
++			var take := mini(mag_size, reserve)
++			reserve -= take
+ 			mag = take
+ 	elif mag <= 0:
+ 		_start_reload()
+@@ -486,23 +509,48 @@
+ 	if mag_size <= 0:
+ 		return ""
+ 	if out_of_ammo():
+-		return "NO AMMO. Loaders bring crates between waves"
+-	var r := "infinite (safe zone)" if zone > 0 else "%d spare" % reserve
++		return "NO AMMO. Needs crates in the zone" if zone > 0 else "NO AMMO. Loaders bring crates between waves"
++	var r := "%d spare" % reserve
++	if zone > 0:
++		r += " (fed from zone crates)"
+ 	if reload_t > 0.0:
+ 		return "Reloading...  ·  %s" % r
+ 	return "Ammo %d/%d  ·  %s" % [mag, mag_size, r]
+ 
+ func needs_repair() -> bool:
+-	return state == BUILT and has_health() and hp < max_hp * 0.98 and not under_attack()
++	return state == BUILT and has_health() and hp < max_hp * 0.98 and not under_attack() and _can_pay_repair()
+ 
+-func under_attack() -> bool:
+-	return G.sim_time - hit_at < 3.0
++# What it would cost to put up again: repairs are charged against this.
++func build_value() -> float:
++	if def.has("per_m") and "length" in self:
++		return float(def["per_m"]) * float(get("length"))
++	return float(def.get("cost", def.get("claim", 0)))
++
++func _repair_unit() -> float:
++	return build_value() * Defs.REPAIR_COST / max_hp
++
++func _can_pay_repair() -> bool:
++	return G.main == null or _repair_unit() <= 0.0 or G.main.supplies >= 1
+ 
+ func repair(dt: float) -> bool:
+-	hp = minf(max_hp, hp + dt * maxf(40.0, max_hp * 0.04))
++	var add := minf(max_hp - hp, dt * maxf(40.0, max_hp * 0.04))
++	var unit := _repair_unit()
++	if unit > 0.0 and G.main:
++		_repair_debt += add * unit
++		if _repair_debt >= 1.0:
++			var n := int(_repair_debt)
++			if not G.main.spend(n):
++				return true
++			_repair_debt -= n
++			G.main.repair_spent += n
++	hp = minf(max_hp, hp + add)
+ 	damage_look()
+ 	return hp >= max_hp
+ 
++func under_attack() -> bool:
++	return G.sim_time - hit_at < 3.0
++
++
+ func is_wallish() -> bool:
+ 	return rect
+ 
+diff -ru src_orig/scripts/defs.gd src/scripts/defs.gd
+--- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
++++ b/scripts/defs.gd	2026-10-24 19:14:31.154073723 +0000
+@@ -24,7 +24,7 @@
+ const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
+ const START_CRATES := 6
+ const HQ_STORE := 10
+-const CRATE_COST := 20
++const CRATE_COST := 15
+ const CRAFT_TIME := 8.0
+ const CRAFTERS_PER_WORKSHOP := 2
+ const FETCH_LOAD := 25
+@@ -301,6 +301,7 @@
+ const Z_RUNNER := 1
+ const Z_BRUTE := 2
+ const REFUND_BUILT := 0.5
++const REPAIR_COST := 0.4
+ const Z_HP_GROWTH := 0.38
+ const Z_HP_LATE := 0.05
+ const Z_HP := [33.0, 23.0, 330.0]
+diff -ru src_orig/scripts/logistics.gd src/scripts/logistics.gd
+--- a/scripts/logistics.gd	2026-10-24 19:02:37.755636605 +0000
++++ b/scripts/logistics.gd	2026-10-24 19:07:05.109941219 +0000
+@@ -4,6 +4,7 @@
+ var hq_crates := 0
+ var crafted := 0
+ var fetched := 0
++var zone_fed := 0
+ 
+ func setup(spots: Array) -> void:
+ 	hq_crates = Defs.START_CRATES
+@@ -88,6 +89,26 @@
+ 		r += (s["pos"] as Vector3).distance_to(near)
+ 	return r
+ 
++func _zone_stores(zone: int) -> Array:
++	var out := []
++	for s in stores():
++		var node = s["node"]
++		if int(s["crates"]) > 0 and is_instance_valid(node) and int(node.zone) == zone:
++			out.append(s)
++	return out
++
++func zone_has_crates(zone: int) -> bool:
++	return zone > 0 and not _zone_stores(zone).is_empty()
++
++func take_zone_crate(zone: int) -> bool:
++	if zone <= 0:
++		return false
++	var ss := _zone_stores(zone)
++	if ss.is_empty():
++		return false
++	ss.sort_custom(func(a, b): return int(a["crates"]) > int(b["crates"]))
++	return take_crate(ss[0]["node"])
++
+ func nearest_with_crates(p: Vector3, exclude = null):
+ 	var best = null
+ 	var bd := INF
+diff -ru src_orig/scripts/main.gd src/scripts/main.gd
+--- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
++++ b/scripts/main.gd	2026-10-24 19:11:47.960219608 +0000
+@@ -26,6 +26,7 @@
+ var phase := "title"
+ var phase_t := 0.0
+ var waves_cleared := 0
++var repair_spent := 0
+ var test_mode := false
+ var manual_clock := false
+ var _queue: Array = []
+@@ -1164,6 +1165,10 @@
+ 			quality.next_mode()
+ 			_ui("ui_tap")
+ 			hud.toast("Graphics: %s" % quality.label())
++		"fps":
++			quality.next_fps()
++			_ui("ui_tap")
++			hud.toast("Frame rate: %s%s" % [quality.fps_label(), "  ·  cooler, longer battery" if quality.fps_cap == 30 else ""])
+ 
+ func _card_result(why: String, ok_text: String) -> void:
+ 	if why != "":
+@@ -1191,7 +1196,7 @@
+ 		_ui("zone_breached")
+ 		cam.shake(0.4)
+ 	elif secured:
+-		hud.show_banner("ZONE SECURED", "Guns inside never run dry", Hud.OK)
++		hud.show_banner("ZONE SECURED", "Guns inside restock from crates in the zone", Hud.OK)
+ 
+ func _on_tool_changed(t: String) -> void:
+ 	var h := ""
+@@ -1303,14 +1308,15 @@
+ 
+ func _spawn_step(dt: float) -> void:
+ 	_spawn_t -= dt
++	var cap: int = quality.horde_cap() if quality else Defs.MAX_ALIVE
+ 	while _spawn_t <= 0.0 and not _queue.is_empty():
+-		if zombies.alive_count >= Defs.MAX_ALIVE:
++		if zombies.alive_count >= cap:
+ 			_spawn_t = 0.3
+ 			return
+ 		var pack := mini(_queue.size(), G.rng.randi_range(2, 4) if wave < 4 else G.rng.randi_range(3, 7))
+ 		var at := _spawn_point()
+ 		for k in pack:
+-			if zombies.alive_count >= Defs.MAX_ALIVE:
++			if zombies.alive_count >= cap:
+ 				break
+ 			var kind: int = _queue.pop_back()
+ 			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
+@@ -1354,6 +1360,8 @@
+ 	phase = "build"
+ 	phase_t = Defs.BUILD_PHASE_TIME
+ 	_plan_edges()
++	if wave == 3 and buildings.count_built("workshop") == 0:
++		hud.toast("Guns use up ammo crates. Build a Workshop and add Crafters")
+ 	for t in Defs.TOOLS:
+ 		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
+ 			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
+diff -ru src_orig/scripts/quality.gd src/scripts/quality.gd
+--- a/scripts/quality.gd	2026-10-24 19:02:37.756425757 +0000
++++ b/scripts/quality.gd	2026-10-24 19:27:03.401648103 +0000
+@@ -6,51 +6,128 @@
+ const TOP := 5
+ const BUDGET_MS := 1000.0 / 28.0
+ const UP_FRACTION := 0.7
++# Under a frame cap the frame time sits at the cap, so climbing back up is
++# judged on how busy the frame was (sim + render setup) instead.
++const UP_BUSY_FRACTION := 0.55
+ const UP_HOLD := 3.5
+ const UP_HOLD_MAX := 60.0
+ const WINDOW := 2.0
+ const SETTINGS_PATH := "user://settings.cfg"
+ const ZOMBIE_SHADOWS := [true, false, false, false, false, false]
+ const LOD_BOOST := [0, 0, 1, 1, 2, 2]
+-const RES_SCALE := [1.0, 1.0, 1.0, 0.75, 0.75, 0.6]
++const RES_SCALE := [1.0, 1.0, 0.85, 0.75, 0.7, 0.6]
+ const SUN_SHADOWS := [true, true, true, true, true, false]
+ const SHADOW_REACH := [1.0, 0.85, 0.75, 0.65, 0.55, 0.5]
+ const MESH_LOD := [1.0, 1.0, 2.0, 2.0, 4.0, 4.0]
++const MSAA := [true, true, false, false, false, false]
++const GLOW := [true, true, true, true, false, false]
++const SHADOW_SIZE := [2048, 2048, 1024, 1024, 1024, 1024]
++# Most zombies on the field at once. The rest of the wave waits its turn.
++const HORDE := [640, 640, 560, 480, 420, 360]
++# Phones and tablets: start at Medium and never climb above it on Auto,
++# so a cool phone doesn't push itself until it overheats.
++const MOBILE_CEILING := 2
++const FPS_CHOICES := [30, 60]
+ var mode := AUTO
+ var level := 0
+ var forced_ms := -1.0
++var mobile := false
++var fps_cap := 0
+ var _ms := PackedFloat32Array()
++var _busy := PackedFloat32Array()
+ var _span := 0.0
+ var _sum := 0.0
++var _busy_sum := 0.0
+ var _up_t := 0.0
+ var _grace := 4.0
+ var _hold := {}
+ var _climbed_at := {}
+ var _clock := 0.0
+ var _zoom_shadows := true
++var _shadow_size := 0
++var _vp_rid := RID()
+ 
+ func _ready() -> void:
++	mobile = _detect_mobile()
++	fps_cap = default_fps()
+ 	if not _testing():
+ 		_load()
+-	apply_level(PINNED.get(mode, 0))
++	_apply_fps()
++	var vp := get_viewport()
++	if vp:
++		_vp_rid = vp.get_viewport_rid()
++		RenderingServer.viewport_set_measure_render_time(_vp_rid, true)
++	apply_level(_start_level())
+ 
+ func _testing() -> bool:
+ 	return G.main != null and G.main.test_mode
+ 
++static func _detect_mobile() -> bool:
++	if OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios"):
++		return true
++	if OS.has_feature("web"):
++		var v = JavaScriptBridge.eval("(navigator.maxTouchPoints || 0) > 0 && window.matchMedia('(pointer: coarse)').matches", true)
++		return v is bool and v
++	return false
++
++func default_fps() -> int:
++	if not OS.has_feature("web") and not OS.has_feature("mobile"):
++		return 0
++	return 30 if mobile else 60
++
++func _apply_fps() -> void:
++	if DisplayServer.get_name() == "headless":
++		return
++	Engine.max_fps = fps_cap
++
++func next_fps() -> void:
++	var i := FPS_CHOICES.find(fps_cap)
++	fps_cap = FPS_CHOICES[(i + 1) % FPS_CHOICES.size()]
++	_apply_fps()
++	_go(level)
++	_grace = 2.0
++	_save()
++
++func fps_label() -> String:
++	return "%d FPS" % fps_cap if fps_cap > 0 else "No cap"
++
++func _ceiling() -> int:
++	return MOBILE_CEILING if mobile and mode == AUTO else 0
++
++func _start_level() -> int:
++	if mode != AUTO:
++		return PINNED.get(mode, 0)
++	return _ceiling()
++
++func _frame_ms(dt: float) -> float:
++	return forced_ms if forced_ms >= 0.0 else dt * 1000.0
++
++func _busy_ms(ms: float) -> float:
++	if forced_ms >= 0.0 or not _vp_rid.is_valid():
++		return ms
++	var sim := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
++	var draw := RenderingServer.viewport_get_measured_render_time_cpu(_vp_rid) + RenderingServer.get_frame_setup_time_cpu()
++	return sim + draw
++
+ func tick(dt: float) -> void:
+ 	_clock += dt
+ 	follow_camera()
+ 	var measuring := forced_ms >= 0.0 or DisplayServer.get_name() != "headless"
+ 	if not measuring or mode != AUTO:
+ 		return
+-	var ms := forced_ms if forced_ms >= 0.0 else dt * 1000.0
++	var ms := _frame_ms(dt)
++	var busy := _busy_ms(ms)
+ 	_ms.append(ms)
++	_busy.append(busy)
+ 	_sum += ms
++	_busy_sum += busy
+ 	_span += ms / 1000.0
+ 	while _span > WINDOW and _ms.size() > 1:
+ 		var old := _ms[0]
+ 		_ms.remove_at(0)
+ 		_sum -= old
++		_busy_sum -= _busy[0]
++		_busy.remove_at(0)
+ 		_span -= old / 1000.0
+ 	if _grace > 0.0:
+ 		_grace -= dt
+@@ -58,11 +135,17 @@
+ 	if _span < WINDOW * 0.95:
+ 		return
+ 	var avg := _sum / float(_ms.size())
+-	if avg > BUDGET_MS and level < TOP:
++	var avg_busy := _busy_sum / float(_busy.size())
++	var capped := fps_cap > 0 and forced_ms < 0.0
++	var budget := maxf(BUDGET_MS, 1000.0 / fps_cap * 1.07) if capped else BUDGET_MS
++	var roomy := avg < budget * UP_FRACTION
++	if capped:
++		roomy = avg < budget and avg_busy < 1000.0 / fps_cap * UP_BUSY_FRACTION
++	if avg > budget and level < TOP:
+ 		if _climbed_at.has(level) and _clock - float(_climbed_at[level]) < 15.0:
+ 			_hold[level] = minf(UP_HOLD_MAX, float(_hold.get(level, UP_HOLD)) * 2.0)
+ 		_go(level + 1)
+-	elif avg < BUDGET_MS * UP_FRACTION and level > 0:
++	elif roomy and level > _ceiling():
+ 		_up_t += dt
+ 		if _up_t >= float(_hold.get(level - 1, UP_HOLD)):
+ 			_climbed_at[level - 1] = _clock
+@@ -73,7 +156,9 @@
+ func _go(l: int) -> void:
+ 	apply_level(l)
+ 	_ms.clear()
++	_busy.clear()
+ 	_sum = 0.0
++	_busy_sum = 0.0
+ 	_span = 0.0
+ 	_up_t = 0.0
+ 
+@@ -83,13 +168,23 @@
+ 	if vp:
+ 		vp.scaling_3d_scale = RES_SCALE[level]
+ 		vp.mesh_lod_threshold = MESH_LOD[level]
++		vp.msaa_3d = Viewport.MSAA_2X if MSAA[level] else Viewport.MSAA_DISABLED
++	if _shadow_size != SHADOW_SIZE[level]:
++		_shadow_size = SHADOW_SIZE[level]
++		RenderingServer.directional_shadow_atlas_set_size(_shadow_size, true)
+ 	if G.zombies:
+ 		G.zombies.lod_boost = LOD_BOOST[level]
+-	if G.main and G.main.sun:
+-		G.main.sun.shadow_enabled = SUN_SHADOWS[level]
++	if G.main:
++		if G.main.sun:
++			G.main.sun.shadow_enabled = SUN_SHADOWS[level]
++		if G.main.world_env and G.main.world_env.environment:
++			G.main.world_env.environment.glow_enabled = GLOW[level]
+ 	_zombie_shadows()
+ 	follow_camera()
+ 
++func horde_cap() -> int:
++	return HORDE[level]
++
+ func follow_camera() -> void:
+ 	if G.cam == null or G.main == null or G.main.sun == null:
+ 		return
+@@ -113,7 +208,7 @@
+ func set_mode(m: int) -> void:
+ 	mode = clampi(m, AUTO, LOW)
+ 	_hold.clear()
+-	_go(PINNED.get(mode, 0) if mode != AUTO else 0)
++	_go(_start_level())
+ 	_grace = 2.0
+ 	_save()
+ 
+@@ -136,6 +231,9 @@
+ 	var cf := ConfigFile.new()
+ 	if cf.load(SETTINGS_PATH) == OK:
+ 		mode = clampi(int(cf.get_value("graphics", "quality", AUTO)), AUTO, LOW)
++		var f := int(cf.get_value("graphics", "fps", fps_cap))
++		if FPS_CHOICES.has(f):
++			fps_cap = f
+ 
+ func _save() -> void:
+ 	if _testing():
+@@ -143,4 +241,5 @@
+ 	var cf := ConfigFile.new()
+ 	cf.load(SETTINGS_PATH)
+ 	cf.set_value("graphics", "quality", mode)
++	cf.set_value("graphics", "fps", fps_cap)
+ 	cf.save(SETTINGS_PATH)
+diff -ru src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
+--- a/scripts/ui/card_models.gd	2026-10-24 19:02:37.754539227 +0000
++++ b/scripts/ui/card_models.gd	2026-10-24 19:04:07.169066872 +0000
+@@ -101,14 +101,16 @@
+ 	func card_lines() -> Array:
+ 		var out := []
+ 		if G.main and G.main.quality:
+-			out.append("Graphics: %s" % G.main.quality.label())
++			out.append("Graphics: %s  ·  %s" % [G.main.quality.label(), G.main.quality.fps_label()])
+ 		out.append_array(Array(diagnostic().split("\n")))
+ 		return out
+ 	func card_buttons() -> Array:
+ 		var q := "AUTO"
++		var f := "60"
+ 		if G.main and G.main.quality:
+ 			q = QualityManager.MODE_NAMES[G.main.quality.mode].to_upper()
+-		return [["quality", "QUALITY: %s" % q, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
++			f = str(G.main.quality.fps_cap) if G.main.quality.fps_cap > 0 else "MAX"
++		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
+ 
+ class Ask:
+ 	extends RefCounted
+diff -ru src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
+--- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
++++ b/scripts/ui/icons.gd	2026-10-24 19:04:07.169619717 +0000
+@@ -334,7 +334,7 @@
+ 			return "hammer"
+ 		"expand":
+ 			return "expand"
+-		"auto_rebuild", "quality":
++		"auto_rebuild", "quality", "fps":
+ 			return "auto"
+ 		"floor":
+ 			return "room_block"
+diff -ru src_orig/scripts/ui/world_overlay.gd src/scripts/ui/world_overlay.gd
+--- a/scripts/ui/world_overlay.gd	2026-10-24 19:02:37.754738444 +0000
++++ b/scripts/ui/world_overlay.gd	2026-10-24 19:07:05.110160545 +0000
+@@ -144,7 +144,7 @@
+ 				var af: float = float(b.mag) / float(b.mag_size)
+ 				var col := Color(0.98, 0.82, 0.38) if b.reload_t <= 0.0 else Color(0.6, 0.6, 0.55)
+ 				_bar(ap, 30.0 * zoom, 4.0, af, col)
+-				if b.zone == 0 and b.reserve_max > 0:
++				if b.reserve_max > 0:
+ 					var rf: float = float(b.reserve) / float(b.reserve_max)
+ 					_bar(ap + Vector2(0, 7), 30.0 * zoom, 3.0, rf, Color(0.85, 0.55, 0.2))
+ 	if G.zombies:
