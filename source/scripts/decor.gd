@@ -5,6 +5,11 @@ var ruins: Array[Vector3] = []
 var wrecks: Array = []
 var _bush_mm: MultiMesh
 var _bush_cells := {}
+# Build cell index -> [is_tree, variant, instance] for the scattered rocks and
+# trees near the base, which are cleared when something is built on them.
+var _clutter := {}
+var _tree_mms: Array = []
+var _rock_mms: Array = []
 
 func setup(g: Grid, seed_: int, open_field: bool = true) -> void:
 	grid = g
@@ -41,10 +46,14 @@ func setup(g: Grid, seed_: int, open_field: bool = true) -> void:
 			var v := r.randi_range(0, 2)
 			var s := r.randf_range(0.75, 1.0)
 			rock_xf[v].append(Transform3D(Basis.from_euler(Vector3(0, r.randf() * TAU, 0)).scaled(Vector3(s, s * r.randf_range(0.8, 1.2), s)), p + jitter))
+			_clutter[i] = [false, v, rock_xf[v].size() - 1]
 		else:
 			var v := 2 if r.randf() < 0.3 else r.randi_range(0, 1)
 			var s := r.randf_range(0.85, 1.25)
 			tree_xf[v].append(Transform3D(Basis.from_euler(Vector3(0, r.randf() * TAU, 0)).scaled(Vector3(s, s, s)), p + jitter))
+			_clutter[i] = [true, v, tree_xf[v].size() - 1]
+		for n in grid.build_to_nav_cells(c):
+			grid.clutter_nav[grid.nidx(n)] = self
 		placed += 1
 	var h := Defs.HALF
 	for i in 900:
@@ -66,8 +75,8 @@ func setup(g: Grid, seed_: int, open_field: bool = true) -> void:
 			var s := r.randf_range(0.9, 1.7)
 			tree_xf[v].append(Transform3D(Basis.from_euler(Vector3(0, r.randf() * TAU, 0)).scaled(Vector3(s, s * r.randf_range(0.9, 1.25), s)), p))
 	for v in 3:
-		_mm(Art.tree_mesh(v), tree_xf[v], true)
-		_mm(Art.rock_mesh(v), rock_xf[v], true)
+		_tree_mms.append(_mm(Art.tree_mesh(v), tree_xf[v], true))
+		_rock_mms.append(_mm(Art.rock_mesh(v), rock_xf[v], true))
 	var bush_xf := []
 	var bush_cell := []
 	for i in 1400:
@@ -141,6 +150,25 @@ func _place_ruins(r: RandomNumberGenerator) -> void:
 		mi.rotation.y = r.randf() * TAU
 		add_child(mi)
 		ruins.append(p - p.normalized() * 6.0)
+
+func clear_clutter(ni: int) -> void:
+	var c := Defs.nav_to_build(grid.ncell_of(ni))
+	var i := grid.idx(c)
+	for n in grid.build_to_nav_cells(c):
+		grid.clutter_nav.erase(grid.nidx(n))
+	if not _clutter.has(i):
+		return
+	var e: Array = _clutter[i]
+	_clutter.erase(i)
+	var mm: MultiMesh = (_tree_mms if e[0] else _rock_mms)[e[1]]
+	mm.set_instance_transform(e[2], Transform3D(Basis.from_scale(Vector3(0.001, 0.001, 0.001)), Vector3(0, -50, 0)))
+	grid.terrain[i] = Defs.T_GROUND
+	for n in grid.build_to_nav_cells(c):
+		var k := grid.nidx(n)
+		if grid.nblk[k] == Grid.N_ROCK:
+			grid.nblk[k] = Grid.N_OPEN
+	if G.fx:
+		G.fx.dust(Defs.cell_center(c) + Vector3(0, 0.4, 0), 0.8)
 
 func clear_cell(c: Vector2i) -> void:
 	var ci := grid.idx(c)

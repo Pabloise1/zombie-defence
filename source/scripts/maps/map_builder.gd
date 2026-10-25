@@ -14,6 +14,7 @@ var paved := {}
 var _base := {}
 var _mm := {}
 var _fence_mm := {}
+var _tree_refs := {}
 
 func build(d: Dictionary, seed_: int) -> void:
 	layout = d
@@ -196,6 +197,25 @@ func _fences() -> void:
 				var xf := Transform3D(Basis(Vector3.UP, ang).scaled(Vector3(pl / 2.0, 1, 1)), p)
 				run.pieces.append(_mm_add(FenceRun.model_of(run.kind), xf))
 
+# A tree that something is being built on: hide it and free the cell.
+func clear_clutter(ni: int) -> void:
+	G.grid.clutter_nav.erase(ni)
+	if not _tree_refs.has(ni):
+		return
+	var ref: Array = _tree_refs[ni]
+	_tree_refs.erase(ni)
+	_hide_ref(ref)
+	unblock(PackedInt32Array([ni]), self)
+	if G.fx:
+		G.fx.dust(Defs.nav_center(G.grid.ncell_of(ni)) + Vector3(0, 0.5, 0), 0.9)
+
+func _hide_ref(ref: Array) -> void:
+	var mm: Dictionary = _mm[ref[0]]
+	var xf: Transform3D = mm["xforms"][ref[1]]
+	mm["xforms"][ref[1]] = Transform3D(Basis().scaled(Vector3(0.001, 0.001, 0.001)), xf.origin - Vector3(0, 50, 0))
+	if mm.has("mmi"):
+		(mm["mmi"] as MultiMeshInstance3D).multimesh.set_instance_transform(ref[1], mm["xforms"][ref[1]] * mm["base"])
+
 func hide_run(run) -> void:
 	for ref in run.pieces:
 		var mm: Dictionary = _mm[ref[0]]
@@ -255,7 +275,7 @@ func _buildings() -> void:
 func blast_at(p: Vector3, r: float) -> void:
 	for pu in pumps.duplicate():
 		var mb = pu[1]
-		if not is_instance_valid(mb) or mb.exploded:
+		if not is_instance_valid(mb) or mb.exploded or mb.cleared:
 			continue
 		if Vector2(p.x - pu[0].x, p.z - pu[0].z).length() <= r + 1.5:
 			mb.explode()
@@ -287,10 +307,13 @@ func _trees() -> void:
 		var s := float(t.get("s", 1.0))
 		var pos: Vector3 = t["pos"]
 		var xf := Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.1), s)), pos)
-		_mm_add(SUBURB + kind, xf)
+		var ref := _mm_add(SUBURB + kind, xf)
 		var n := Defs.world_to_nav(pos)
 		if G.grid.ninb(n):
-			_block(PackedInt32Array([G.grid.nidx(n)]), Grid.N_STATIC, self)
+			var ni: int = G.grid.nidx(n)
+			_block(PackedInt32Array([ni]), Grid.N_STATIC, self)
+			_tree_refs[ni] = ref
+			G.grid.clutter_nav[ni] = self
 
 func _mm_add(kind: String, xf: Transform3D) -> Array:
 	if not _mm.has(kind):

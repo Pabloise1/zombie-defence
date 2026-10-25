@@ -1,6 +1,7 @@
 class_name Zombie
 extends Node3D
-enum {WALK, ATTACK, FALL, CLIMB, DEAD}
+enum {WALK, ATTACK, FALL, CLIMB, DEAD, VAULT}
+const VAULT_TIME := 1.1
 const REACH := 0.55
 const ATTACK_INTERVAL := 1.15
 const SINK_TIME := 1.2
@@ -60,8 +61,6 @@ var _hit_t := 0.0
 var _hit_hp := 0.0
 var _ignore = null
 var _ignore_t := 0.0
-var _in_t := 0.0
-var _in_target = null
 var _no_prey = null
 var _no_prey_t := 0.0
 var _an_speed := 1.0
@@ -77,6 +76,15 @@ var placeholder := true
 var model_h := 1.76
 var _mat_state := -1
 var _cur_anim := ""
+# World War Z piles: zombies pressing on a wall climb on each other; once
+# the pile is as tall as the wall the ones on top go over.
+var climb_skill := 0.5
+var piling := false
+var vault_t := 0.0
+var vault_from := Vector3.ZERO
+var vault_to := Vector3.ZERO
+var vault_y0 := 0.0
+var vault_h := 2.0
 
 func build(v: String) -> void:
 	variant = v
@@ -109,6 +117,8 @@ func reset(k: int, pos: Vector3, wave: int) -> void:
 	burn_t = 0.0
 	burn_fx = -1
 	attack_t = randf_range(0.2, 0.8)
+	climb_skill = randf()
+	piling = false
 	lane = Vector2(randf_range(-0.45, 0.45), randf_range(-0.45, 0.45))
 	stuck_t = 0.0
 	lost_t = 0.0
@@ -295,6 +305,21 @@ func step(dt: float) -> void:
 			return
 	else:
 		lost_t = 0.0
+	if st == VAULT:
+		vault_t += dt
+		var vf := clampf(vault_t / VAULT_TIME, 0.0, 1.0)
+		var vp := vault_from.lerp(vault_to, vf)
+		position.x = vp.x
+		position.z = vp.z
+		y = lerpf(vault_y0, fy, vf) + sin(vf * PI) * maxf(0.4, vault_h + 0.4 - lerpf(vault_y0, fy, vf))
+		if vf >= 1.0:
+			y = fy
+			st = WALK
+			stagger_t = 0.4
+		_finish_step(dt, false)
+		return
+	var was_piling := piling
+	piling = false
 	if st == CLIMB:
 		climb_t += dt
 		var f := clampf(climb_t / climb_total, 0.0, 1.0)
@@ -305,7 +330,7 @@ func step(dt: float) -> void:
 			position += climb_dir * 0.6
 		_finish_step(dt, false)
 		return
-	if y > fy + 0.02:
+	if y > fy + 0.02 and not was_piling:
 		if st != FALL:
 			st = FALL
 			vy = 0.0
@@ -345,19 +370,6 @@ func step(dt: float) -> void:
 					break
 				j = flow.next[j]
 		goal = Defs.nav_center(g.ncell_of(nx)) + Vector3(lane.x, 0, lane.y)
-	var zr := 0
-	if G.zones and G.zones.region.size() > ci:
-		zr = G.zones.region[ci]
-	if zr == 0 and blocker is LinearStructure and _inside_of(blocker):
-		zr = _inside_zone(blocker)
-	if zr > 0:
-		_in_t -= dt
-		if _in_t <= 0.0 or _in_target == null or not is_instance_valid(_in_target) or _in_target.state != Building.BUILT:
-			_in_t = 1.0
-			_in_target = _pick_inside(zr)
-		if blocker is LinearStructure or blocker == null:
-			blocker = _in_target
-			goal = _in_target.position if _in_target != null else Defs.hq_center()
 	if _no_prey_t > 0.0:
 		_no_prey_t -= dt
 	scan_t -= dt
@@ -408,6 +420,11 @@ func step(dt: float) -> void:
 		var reach := REACH * scale.x
 		if blocker.edge_distance(position) <= reach:
 			_attack(blocker, dt)
+			if blocker is LinearStructure and kind != Defs.Z_BRUTE and fy > -0.5:
+				_pile(blocker, dt, fy)
+				if st == VAULT:
+					_finish_step(dt, false)
+					return
 			if sep.length_squared() > 0.01:
 				if blocker is LinearStructure:
 					var along: Vector3 = blocker.dir * (sep.x * blocker.dir.x + sep.y * blocker.dir.z)
@@ -494,6 +511,40 @@ func step(dt: float) -> void:
 		heading = atan2(-mv.x, -mv.z)
 	_finish_step(dt, true)
 
+func _pile(w, dt: float, fy: float) -> void:
+	var h := float(w.def.get("height", 2.2))
+	var f := clampf(float(w.press) / float(w.pile_need()), 0.0, 1.0)
+	var want := fy + h * f * (0.2 + 0.8 * climb_skill)
+	piling = true
+	y = move_toward(y, maxf(fy, want), dt * 1.8)
+	if f >= 1.0 and y >= fy + h * 0.7:
+		_start_vault(w, h, fy)
+
+func _start_vault(w, h: float, fy: float) -> void:
+	var n := Vector3(-w.dir.z, 0, w.dir.x)
+	var side := signf((position - w.position).dot(n))
+	if side == 0.0:
+		side = 1.0
+	var along := clampf((position - w.a).dot(w.dir), 0.0, w.length)
+	var base: Vector3 = w.a + w.dir * along
+	for d in [1.4, 2.0, 2.7]:
+		var to: Vector3 = base - n * side * d
+		var c := Vector2i(floori(to.x + Defs.HALF), floori(to.z + Defs.HALF))
+		if c.x < 0 or c.y < 0 or c.x >= Defs.NW or c.y >= Defs.NH:
+			continue
+		var b: int = G.grid.nblk[c.y * Defs.NW + c.x]
+		if b != Grid.N_OPEN and b != Grid.N_SLOW:
+			continue
+		vault_from = position
+		vault_to = Vector3(to.x, 0, to.z)
+		vault_y0 = y
+		vault_h = h
+		vault_t = 0.0
+		st = VAULT
+		target = null
+		piling = false
+		return
+
 func _move(mv: Vector3, cur: int, fy: float) -> void:
 	var np := position + mv
 	if not _can_enter(np, cur, fy):
@@ -553,42 +604,6 @@ func _can_enter(p: Vector3, cur: int, fy: float) -> bool:
 		if t != Defs.T_TRENCH and t != Defs.T_TUNNEL:
 			return false
 	return true
-
-func _inside_of(w) -> bool:
-	if w.state != Building.BUILT or G.zones == null:
-		return false
-	var n := Vector3(-w.dir.z, 0, w.dir.x)
-	var za: int = G.zones.zone_at(w.position + n * 1.3)
-	var zb: int = G.zones.zone_at(w.position - n * 1.3)
-	if za == zb:
-		return false
-	var side: float = (position - w.position).dot(n)
-	return (side > 0.0 and za > 0) or (side < 0.0 and zb > 0)
-
-func _inside_zone(w) -> int:
-	var n := Vector3(-w.dir.z, 0, w.dir.x)
-	var za: int = G.zones.zone_at(w.position + n * 1.3)
-	var zb: int = G.zones.zone_at(w.position - n * 1.3)
-	return za if (position - w.position).dot(n) > 0.0 else zb
-
-func _pick_inside(zr: int):
-	var best = null
-	var bd := INF
-	for b in G.buildings.list:
-		if not is_instance_valid(b) or b.state != Building.BUILT or b.host != null or b is LinearStructure:
-			continue
-		if not b.has_health() or not b.blocks_now():
-			continue
-		var gun: bool = b.is_gun()
-		if b.zone != zr and b != G.buildings.hq:
-			continue
-		var d: float = b.position.distance_to(position)
-		if not gun and b != G.buildings.hq:
-			d += 30.0
-		if d < bd:
-			bd = d
-			best = b
-	return best
 
 func enrage() -> void:
 	if enraged or not alive:
@@ -669,7 +684,7 @@ func _finish_step(dt: float, moving: bool) -> void:
 	var want_look := 0
 	if flash_t > 0.0:
 		want_look = 3
-	elif st == ATTACK or st == CLIMB:
+	elif st == ATTACK or st == CLIMB or st == VAULT:
 		want_look = 1
 	if want_look != _mat_state or (want_look == 0 and _cur_anim != an_walk):
 		_apply_look()
@@ -740,7 +755,7 @@ func _apply_look() -> void:
 	if anim:
 		var a := an_walk
 		var sp := _an_speed
-		if st == ATTACK or st == CLIMB:
+		if st == ATTACK or st == CLIMB or st == VAULT:
 			a = an_attack if an_attack != "" else an_walk
 			sp = 1.0
 		elif st == DEAD:

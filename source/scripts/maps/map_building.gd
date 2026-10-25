@@ -2,6 +2,8 @@ class_name MapBuilding
 extends PrefabBuilding
 var claimed := false
 var claiming := false
+# Houses aren't claimed any more: workers knock them down for supplies.
+var cleared := false
 var contents := {}
 var exploded := false
 var fp_off := Vector3.ZERO
@@ -69,6 +71,18 @@ func capacity() -> int:
 func claim_cost() -> int:
 	return int(def.get("claim", 120))
 
+func clear_value() -> int:
+	return int(def.get("claim", 50))
+
+func start_clear() -> String:
+	if cleared or claiming:
+		return "Already being cleared"
+	claiming = true
+	progress = 0.0
+	paid = 0
+	G.workers.add_job(self)
+	return ""
+
 func start_claim() -> String:
 	if claimed or claiming:
 		return "Already yours"
@@ -85,7 +99,6 @@ func cancel_claim() -> void:
 		return
 	claiming = false
 	G.workers.remove_job(self)
-	G.main.add_supplies(paid if progress <= 0.0 else int(paid * 0.5))
 	paid = 0
 	progress = 1.0
 
@@ -99,10 +112,47 @@ func work(dt: float) -> bool:
 	if not claiming:
 		return true
 	progress += dt / maxf(0.5, float(def.get("claim_time", 18.0)))
+	if G.fx and randf() < dt * 1.2:
+		G.fx.dust(position + Vector3(randf_range(-2, 2), 0.6, randf_range(-2, 2)), 1.0)
 	if progress >= 1.0:
-		_claimed()
+		_cleared()
 		return true
 	return false
+
+func _cleared(quiet: bool = false) -> void:
+	claiming = false
+	cleared = true
+	state = DEAD
+	visible = false
+	map.unblock(nav_list, self)
+	for c in cell_list:
+		var i: int = G.grid.idx(c)
+		if G.grid.occ[i] == self:
+			G.grid.occ[i] = null
+	G.grid.notify_paths_changed()
+	if quiet:
+		return
+	if G.fx:
+		G.fx.dust(position + Vector3(0, 0.8, 0), 3.0)
+		G.fx.debris(position + Vector3(0, 1.0, 0), 3)
+	if G.sfx:
+		G.sfx.play("build", position)
+	G.main.add_supplies(clear_value())
+	var found := ""
+	if contents.has("survivors"):
+		var n := mini(int(contents["survivors"]), maxi(1, G.people.room()))
+		for i in n:
+			G.people.spawn_civilian(position + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5)), false)
+		found = "  ·  %d survivor%s were hiding" % [n, "" if n == 1 else "s"]
+	elif contents.has("supplies"):
+		G.main.add_supplies(int(contents["supplies"]))
+		found = "  ·  found %d more" % int(contents["supplies"])
+	elif contents.has("crates"):
+		var got: int = G.logi.add_crates(int(contents["crates"]), position)
+		found = "  ·  found %d ammo crate%s" % [got, "" if got == 1 else "s"]
+	contents = {}
+	if G.hud:
+		G.hud.toast("Cleared +%d supplies%s" % [clear_value(), found])
 
 func _claimed(quiet: bool = false) -> void:
 	claiming = false
@@ -193,10 +243,9 @@ func card_lines() -> Array:
 	var out := []
 	if not claimed:
 		if claiming:
-			out.append("Being secured  %d%%" % int(progress * 100.0))
+			out.append("Being cleared  %d%%" % int(progress * 100.0))
 		else:
-			out.append("Not yours. Claim it: workers secure it (~%ds)" % int(def.get("claim_time", 18.0)))
-			out.append("Safe house: survivors out here hide in it till the wave ends")
+			out.append("In the way? Workers can knock it down (~%ds) for +%d supplies" % [int(def.get("claim_time", 18.0)), clear_value()])
 			out.append("Might hide survivors or supplies")
 		if kind == "petrol_station" and not exploded:
 			out.append("Pumps: a shell or blast there sets them off. Big explosion")
@@ -216,7 +265,7 @@ func card_buttons() -> Array:
 			return []
 		if claiming:
 			return [["cancel_claim", "CANCEL", true]]
-		return [["claim", "CLAIM %d" % claim_cost(), G.main.supplies >= claim_cost()]]
+		return [["clear_house", "CLEAR +%d" % clear_value(), true]]
 	var out := []
 	if capacity() > 0:
 		var idle: int = G.soldiers.idle_count() if G.soldiers else 0

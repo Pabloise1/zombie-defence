@@ -1174,6 +1174,8 @@ func _on_card_action(id: String, target) -> void:
 			_ui("ui_tap")
 			hud.toast("Auto rebuild %s" % ("on" if walls.auto_rebuild else "off"))
 			hud.show_card(target)
+		"clear_house":
+			_card_result(target.start_clear(), "Workers will knock it down")
 		"claim_fence":
 			_card_result(target.claim(), "Workers will make it part of your walls")
 		"sound_test":
@@ -1346,7 +1348,7 @@ func start_wave() -> void:
 	var count := wave_size(wave)
 	var runner_frac := 0.0
 	if wave >= 3:
-		runner_frac = minf(0.3, 0.1 + 0.025 * (wave - 3))
+		runner_frac = minf(0.45, 0.15 + 0.035 * (wave - 3))
 	var brutes := mini(count, int(round(brute_count(wave) * horde_mult)))
 	for i in count - brutes:
 		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)

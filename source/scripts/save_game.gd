@@ -68,7 +68,9 @@ static func capture(m) -> Dictionary:
 	if G.map:
 		for i in G.map.buildings.size():
 			var mb = G.map.buildings[i]
-			if is_instance_valid(mb) and (mb.claimed or mb.exploded or mb.state == Building.DEAD):
+			if is_instance_valid(mb) and mb.cleared:
+				claims.append({"i": i, "cleared": true})
+			elif is_instance_valid(mb) and (mb.claimed or mb.exploded or mb.state == Building.DEAD):
 				claims.append({"i": i, "claimed": mb.claimed, "hp": mb.hp, "dead": mb.state == Building.DEAD, "exploded": mb.exploded})
 		for i in G.map.fences.size():
 			if G.map.fences[i].claimed:
@@ -209,6 +211,9 @@ static func restore(m, d: Dictionary) -> bool:
 		for c in d.get("claims", []):
 			var mb = G.map.buildings[int(c["i"])] if int(c["i"]) < G.map.buildings.size() else null
 			if mb == null:
+				continue
+			if bool(c.get("cleared", false)):
+				mb._cleared(true)
 				continue
 			if bool(c.get("claimed", false)) or bool(c.get("dead", false)):
 				mb.contents = {}

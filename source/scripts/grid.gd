@@ -94,6 +94,33 @@ func blocker_at_i(i: int):
 		return b
 	return null
 
+# Scattered rocks and trees that building over clears away. Nav index ->
+# the node that owns it (Decor or MapBuilder), which has clear_clutter(ni).
+var clutter_nav := {}
+
+func is_clutter_cell(c: Vector2i) -> bool:
+	for n in build_to_nav_cells(c):
+		if clutter_nav.has(nidx(n)):
+			return true
+	return false
+
+func clear_clutter(navs) -> void:
+	var any := false
+	for ni in navs:
+		var o = clutter_nav.get(ni)
+		if o != null and is_instance_valid(o):
+			o.clear_clutter(ni)
+			any = true
+	if any:
+		notify_paths_changed()
+
+func clear_clutter_cells(cells) -> void:
+	var navs := []
+	for c in cells:
+		for n in build_to_nav_cells(c):
+			navs.append(nidx(n))
+	clear_clutter(navs)
+
 func set_rock(c: Vector2i) -> void:
 	terrain[idx(c)] = Defs.T_ROCK
 	for n in build_to_nav_cells(c):

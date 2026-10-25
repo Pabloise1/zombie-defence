@@ -68,18 +68,24 @@ func update(budget_usec: int = 3000) -> void:
 func is_busy() -> bool:
 	return _busy or _dirty
 
-func _goal_bias(owner) -> float:
-	if owner == null:
-		return 6.0
-	if owner is HQBuilding:
-		return 0.0
-	if owner is Building and owner.def.has("lure"):
+# Zombies head for the HQ (and decoys). Walls and buildings aren't targets,
+# just obstacles that cost something to break through, so the horde takes
+# the cheapest way in: round through a gap, or through the weakest wall.
+func _is_goal(i: int, owner) -> bool:
+	return grid.hq_nav.has(i) or (owner is Building and is_instance_valid(owner) and owner.def.has("lure"))
+
+func _goal_dist(owner) -> float:
+	if owner is Building and is_instance_valid(owner) and owner.def.has("lure"):
 		return -float(owner.def["lure"])
+	return 0.0
+
+static func break_cost(owner) -> float:
+	if owner == null or not is_instance_valid(owner) or not (owner is Building):
+		return 12.0
 	if owner is LinearStructure:
-		return 5.0
-	if Defs.GUNS.has(owner.kind):
-		return 3.0
-	return 4.0
+		var per_m := float(owner.def.get("hp_per_m", owner.max_hp / maxf(1.0, owner.length)))
+		return 6.0 + per_m / 100.0
+	return 6.0 + owner.max_hp / 400.0
 
 func _start() -> void:
 	var t0 := Time.get_ticks_usec()
@@ -111,12 +117,17 @@ func _init_rows(rows: int) -> void:
 				_open[i] = 0
 				_skip[i] = 1
 			else:
-				_cost[i] = 1.0
+				var own = grid.nown[i]
 				_open[i] = 0
-				_skip[i] = 1
-				var d := 0.0 if grid.hq_nav.has(i) else _goal_bias(grid.nown[i])
-				_wd[i] = d
-				_push(d, i)
+				if _is_goal(i, own):
+					_cost[i] = 1.0
+					_skip[i] = 1
+					var d := _goal_dist(own)
+					_wd[i] = d
+					_push(d, i)
+				else:
+					_cost[i] = break_cost(own)
+					_skip[i] = 0
 	_row = y1
 	if _row >= NH:
 		var blist: Array = G.buildings.list if G.buildings else []

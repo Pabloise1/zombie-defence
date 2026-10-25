@@ -95,12 +95,15 @@ func _check_cell(kind: String, d: Dictionary, c: Vector2i, ignore = null) -> Str
 	if g.is_hq(c):
 		return "That's the HQ"
 	var i := g.idx(c)
-	if g.terrain[i] == Defs.T_ROCK:
+	var clutter := g.is_clutter_cell(c)
+	if g.terrain[i] == Defs.T_ROCK and not clutter:
 		return "Blocked"
 	if (g.occ[i] != null and g.occ[i] != ignore) or g.digs[i] != null:
 		return "Already used"
 	for n in g.build_to_nav_cells(c):
 		var ni := g.nidx(n)
+		if g.clutter_nav.has(ni):
+			continue
 		if g.nblk[ni] != Grid.N_OPEN and not (ignore != null and g.nown[ni] == ignore):
 			if g.nblk[ni] == Grid.N_SLOW:
 				return "A fence is in the way"
@@ -134,6 +137,7 @@ func place(kind: String, c: Vector2i, rest: float = 0.0) -> bool:
 		return false
 	_order += 1
 	var i: int = G.grid.idx(c)
+	G.grid.clear_clutter_cells(_footprint(kind, c))
 	if kind == "dig":
 		var m := DigMark.new()
 		add_child(m)
@@ -164,6 +168,7 @@ func place(kind: String, c: Vector2i, rest: float = 0.0) -> bool:
 func place_built(kind: String, c: Vector2i) -> Building:
 	if check(kind, c) != "" or kind == "dig":
 		return null
+	G.grid.clear_clutter_cells(_footprint(kind, c))
 	var b := _make(kind)
 	add_child(b)
 	for cc in _footprint(kind, c):
@@ -199,7 +204,7 @@ func check_rect(kind: String, p: Vector3, yaw: float, ignore = null, cut: Array 
 		var i := g.idx(c)
 		if g.is_hq(c):
 			return "That's the HQ"
-		if g.terrain[i] == Defs.T_ROCK:
+		if g.terrain[i] == Defs.T_ROCK and not g.is_clutter_cell(c):
 			return "Blocked"
 		if g.is_trench(c) or g.digs[i] != null:
 			return "Not on a trench"
@@ -208,7 +213,7 @@ func check_rect(kind: String, p: Vector3, yaw: float, ignore = null, cut: Array 
 			return "Something's in the way"
 	for ni in fp["nav"]:
 		var b := g.nblk[ni]
-		if b == Grid.N_OPEN:
+		if b == Grid.N_OPEN or g.clutter_nav.has(ni):
 			continue
 		var own = g.nown[ni]
 		if own != null and (own == ignore or cut.has(own)):
@@ -257,6 +262,7 @@ func place_rect(kind: String, p: Vector3, yaw: float, built: bool = false, cut: 
 		return null
 	_order += 1
 	var fp := rect_of(kind, p, yaw)
+	G.grid.clear_clutter(fp["nav"])
 	var b := _make(kind)
 	add_child(b)
 	for c in fp["cells"]:

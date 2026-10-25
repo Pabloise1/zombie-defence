@@ -160,9 +160,15 @@ func step(dt: float) -> void:
 func _build_buckets() -> void:
 	cell_head.fill(-1)
 	alive_list.clear()
+	if G.walls:
+		for s in G.walls.segments:
+			if is_instance_valid(s):
+				s.press = 0
 	for z in active:
 		if z.alive:
 			alive_list.append(z)
+			if z.st == Zombie.ATTACK and z.target is LinearStructure and is_instance_valid(z.target):
+				z.target.press += 2 if z.kind == Defs.Z_BRUTE else 1
 	var n := alive_list.size()
 	if znext.size() < n:
 		znext.resize(n * 2)

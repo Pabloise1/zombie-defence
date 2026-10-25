@@ -114,12 +114,12 @@ func check_segment(a: Vector3, b: Vector3, ignore: Array = []) -> String:
 		var own = g.nown[i]
 		if own != null and ignore.has(own):
 			continue
-		if blk == Grid.N_ROCK or blk == Grid.N_STATIC:
+		if (blk == Grid.N_ROCK or blk == Grid.N_STATIC) and not g.clutter_nav.has(i):
 			return "Something's in the way"
 		if blk == Grid.N_BUILD and not near_end:
 			return "Something's in the way"
 		var bc := Defs.nav_to_build(c)
-		if g.inb(bc):
+		if g.inb(bc) and not g.clutter_nav.has(i):
 			var o = g.occ[g.idx(bc)]
 			if o != null and not (o is LinearStructure) and not o.rect and o != G.buildings.hq:
 				return "Something's in the way"
@@ -284,6 +284,7 @@ func lay(kind: String, a: Vector3, b: Vector3, paid: int, built: bool, rebuild :
 	return made
 
 func _make(kind: String, a: Vector3, b: Vector3, built: bool, ports := false, heavy := false) -> LinearStructure:
+	G.grid.clear_clutter(G.grid.supercover(a, b))
 	var s := LinearStructure.new()
 	s.name = "%s_%d" % [kind, segments.size()]
 	s.heavy = heavy

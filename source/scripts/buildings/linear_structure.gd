@@ -16,6 +16,12 @@ var _want_open := 0.0
 var _gate_cells := {}
 var _gate_t := 0.0
 var heavy := false
+# Zombies pressing on this wall right now (brutes count 2), from ZombieManager.
+var press := 0
+
+# How many zombies it takes to pile up and climb over it.
+func pile_need() -> int:
+	return maxi(3, int(ceil(float(def.get("height", 2.2)) * 3.5)))
 
 func setup_linear(k: String, d: Dictionary, pa: Vector3, pb: Vector3, blueprint: bool, with_ports: bool = false) -> void:
 	kind = k
