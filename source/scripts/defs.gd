@@ -377,7 +377,7 @@ const MAPS := [
 	{"id": "fields", "name": "Fields", "about": "Open farmland. The first map", "ready": true},
 	{"id": "suburb", "name": "Suburb", "about": "Streets, houses to claim, a petrol station", "ready": true},
 	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
-	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
+	{"id": "city", "name": "City", "about": "Tall blocks. Streets funnel the horde", "ready": true},
 ]
 const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
 	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard", "outpost"]

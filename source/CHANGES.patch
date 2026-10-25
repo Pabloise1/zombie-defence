@@ -1253,7 +1253,7 @@ diff -ruN src_orig/scripts/decor.gd src/scripts/decor.gd
  	if not _bush_cells.has(ci):
 diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
-+++ b/scripts/defs.gd	2026-10-25 07:40:28.742318844 +0000
++++ b/scripts/defs.gd	2026-10-25 08:08:36.618071757 +0000
 @@ -24,7 +24,7 @@
  const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
  const START_CRATES := 6
@@ -1417,9 +1417,12 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const MAP_BUILDINGS := {
  	"house_two_storey": {
  		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
-@@ -268,8 +379,9 @@
+@@ -266,10 +377,11 @@
+ 	{"id": "fields", "name": "Fields", "about": "Open farmland. The first map", "ready": true},
+ 	{"id": "suburb", "name": "Suburb", "about": "Streets, houses to claim, a petrol station", "ready": true},
  	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
- 	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
+-	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
++	{"id": "city", "name": "City", "about": "Tall blocks. Streets funnel the horde", "ready": true},
  ]
 -const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large"]
 -const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
@@ -1458,6 +1461,486 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  		"mortar":
  			return MORTAR_MAX
  		"sniper":
+diff -ruN src_orig/scripts/defs.gd.orig src/scripts/defs.gd.orig
+--- a/scripts/defs.gd.orig	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/defs.gd.orig	2026-10-25 07:40:28.742318844 +0000
+@@ -0,0 +1,476 @@
++class_name Defs
++extends RefCounted
++const CELL := 2.0
++const W := 97
++const H := 97
++const HALF := W * CELL * 0.5
++const NAV := 1.0
++const NW := 194
++const NH := 194
++const TRENCH_DEPTH := 1.5
++const HQ_ORIGIN := Vector2i(47, 47)
++const HQ_SIZE := 3
++const START_SUPPLIES := 800
++const BUILD_PHASE_TIME := 45.0
++const FIRST_BUILD_PHASE_TIME := 120.0
++const MAX_ALIVE := 640
++const START_PEOPLE := 5
++const START_WORKERS := 3
++const PERSON_HP := 50.0
++const SOLDIER_ARM_COST := 40
++const SOLDIER_ARM_COST_BARRACKS := 20
++const JOBS := ["worker", "soldier", "loader", "fetcher", "crafter"]
++const POP_BASE := 10
++const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
++const START_CRATES := 6
++const HQ_STORE := 10
++const CRATE_COST := 15
++const CRAFT_TIME := 8.0
++const CRAFTERS_PER_WORKSHOP := 2
++const FETCH_LOAD := 25
++const FETCH_FIND := 0.2
++const SALVAGE_SCRAP := 120
++const FUEL_RANGE := 14.0
++const RADIO_GROUPS := 1
++const MOUNTABLE := ["turret", "sniper", "mortar", "flame", "cannon"]
++const PORT_BONUS := 0.25
++const PORT_GUARD := 0.5
++const MOVE_COST := 0.25
++const WALL_MIN_SEG := 1.5
++const WALL_PIECE := 2.0
++const WALL_JOB_MAX := 4.0
++const GATE_WIDTH := 4.0
++const T_GROUND := 0
++const T_TRENCH := 1
++const T_ROCK := 2
++const T_TUNNEL := 3
++const BUILD := {
++	"turret": {
++		"name": "MG", "long": "MG Turret", "cost": 130, "time": 6.0, "hp": 260.0, "blocks": true, "zcost": 10.0,
++		"ground": true, "trench": false, "line": false, "model": "turret_mg",
++		"mag": 60, "reload": 3.0, "reserve": 240,
++		"hint": "Tap to place a machine gun", "about": "Fast fire, mid range",
++	},
++	"cannon": {
++		"name": "Cannon", "long": "Autocannon", "cost": 180, "time": 7.0, "hp": 320.0, "blocks": true, "zcost": 10.0,
++		"ground": true, "trench": false, "line": false, "model": "autocannon", "unlock": 4,
++		"mag": 12, "reload": 4.0, "reserve": 72,
++		"hint": "Tap to place an autocannon", "about": "Heavy shells that burst  ·  brutes first",
++	},
++	"mortar": {
++		"name": "Mortar", "long": "Mortar Pit", "cost": 155, "time": 7.0, "hp": 200.0, "blocks": true, "zcost": 10.0,
++		"ground": true, "trench": false, "line": false, "model": "mortar_pit", "unlock": 3,
++		"mag": 4, "reload": 5.0, "reserve": 24,
++		"hint": "Tap to place. Long range, can't hit close", "about": "Shells crowds far away",
++	},
++	"sniper": {
++		"name": "Sniper", "long": "Sniper Tower", "cost": 130, "time": 6.0, "hp": 160.0, "blocks": true, "zcost": 10.0,
++		"ground": true, "trench": false, "line": false, "model": "sniper_tower", "capacity": 1,
++		"mag": 5, "reload": 3.5, "reserve": 40,
++		"hint": "Tap to place. Needs 1 soldier", "about": "Picks off brutes first",
++	},
++	"flame": {
++		"name": "Flame", "long": "Flame Bunker", "cost": 205, "time": 7.0, "hp": 280.0, "blocks": true, "zcost": 12.0,
++		"ground": true, "trench": false, "line": false, "model": "flame_bunker", "unlock": 5,
++		"mag": 40, "reload": 5.0, "reserve": 300,
++		"hint": "Tap to place. Short range, sets them alight", "about": "Burns everything close",
++	},
++	"concrete": {
++		"name": "Concrete", "long": "Concrete Wall", "per_m": 14, "cost": 28, "time_per_m": 3.0, "hp_per_m": 1600.0,
++		"blocks": true, "linear": true, "thick": 0.8, "height": 3.5, "model": "concrete_wall", "post": "wall_post_concrete",
++		"port_model": "concrete_wall_port", "port_cost": 30, "slot_bonus": 0.35, "bastion": "bastion_c",
++		"hint": "Tap points to draw. Tap the start to close", "about": "Tall and very tough",
++	},
++	"wall": {
++		"name": "Wood", "long": "Wooden Wall", "per_m": 5, "cost": 10, "time_per_m": 1.0, "hp_per_m": 300.0,
++		"blocks": true, "linear": true, "thick": 0.6, "height": 2.2, "model": "wall", "post": "wall_post_wood",
++		"port_model": "wall_port_wood", "port_cost": 18, "slot_bonus": 0.25, "bastion": "bastion",
++		"hint": "Tap points to draw. Tap the start to close", "about": "Cheap. Zombies must break it",
++	},
++	"fortified": {
++		"name": "Fortified", "long": "Fortified Wall", "per_m": 20, "time_per_m": 3.0, "hp_per_m": 3800.0,
++		"blocks": true, "linear": true, "thick": 1.1, "height": 5.0, "model": "fortified_wall", "post": "fortified_post",
++		"port_model": "fortified_wall_port", "port_cost": 36, "slot_bonus": 0.5, "bastion": "bastion_c", "card_only": true,
++		"unlock": 5, "nest_h": 3.7, "nest_in": 0.55, "walk": true, "walk_bonus": 0.4,
++		"about": "5 m tall, a walkway for soldiers and guns",
++	},
++	"gate": {
++		"name": "Gate", "long": "Gate", "cost": 50, "time": 8.0, "hp": 4000.0, "blocks": true, "linear": true,
++		"thick": 0.8, "height": 3.5, "model": "concrete_gate",
++		"hint": "Tap a wall to put a gate in it", "about": "Opens for people, not zombies",
++	},
++	"wire": {
++		"name": "Wire", "long": "Barbed Wire", "cost": 10, "time": 1.5, "hp": 120.0, "blocks": false, "zcost": 4.0,
++		"ground": true, "trench": true, "line": true, "model": "barbed_wire",
++		"hint": "Drag to lay wire", "about": "Slows zombies, wears out",
++	},
++	"garrison": {
++		"name": "Bunker", "long": "Garrison Bunker", "cost": 185, "time": 10.0, "hp": 1400.0, "blocks": true, "zcost": 16.0,
++		"ground": true, "trench": false, "line": false, "model": "garrison_bunker", "capacity": 4, "size": 2,
++		"mag": 120, "reload": 4.0, "reserve": 600,
++		"hint": "Tap to place. Holds 4 soldiers", "about": "Soldiers shoot from the slots",
++	},
++	"platform": {
++		"name": "Platform", "long": "Gun Platform", "cost": 30, "time": 5.0, "hp": 450.0, "blocks": true, "zcost": 8.0,
++		"ground": true, "trench": false, "line": false, "model": "gun_platform", "slot_bonus": 0.25,
++		"hint": "Tap to place, then tap it to put a gun on top", "about": "Raised gun slot  ·  +25% range",
++	},
++	"house": {
++		"name": "House", "long": "House", "cost": 140, "time": 24.0, "hp": 3200.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2, 2), "model": "house", "capacity": 4, "pop": 6, "slot_bonus": 0.45,
++		"hint": "Drag it, turn the handle, then tick", "about": "+6 people  ·  2 roof gun slots",
++	},
++	"depot": {
++		"name": "Depot", "long": "Depot", "cost": 115, "time": 22.0, "hp": 3600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3, 2), "model": "depot", "capacity": 3, "store": 40, "slot_bonus": 0.3,
++		"hint": "Drag it, turn the handle, then tick", "about": "Stores 40 ammo crates",
++	},
++	"workshop": {
++		"name": "Workshop", "long": "Workshop", "cost": 125, "time": 22.0, "hp": 3000.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3, 2), "model": "workshop", "capacity": 2, "slot_bonus": 0.3,
++		"hint": "Drag it, turn the handle, then tick", "about": "Crafters turn supplies into ammo",
++	},
++	"barracks": {
++		"name": "Barracks", "long": "Barracks", "cost": 165, "time": 26.0, "hp": 4200.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3, 2), "model": "barracks", "capacity": 6, "pop": 4, "slot_bonus": 0.3,
++		"hint": "Drag it, turn the handle, then tick", "about": "+4 people  ·  soldiers heal here",
++	},
++	"watchtower": {
++		"name": "Tower", "long": "Concrete Watchtower", "cost": 105, "time": 18.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1, 1), "model": "watchtower_concrete", "capacity": 3, "slot_bonus": 0.7,
++		"hint": "Drag it, turn the handle, then tick", "about": "Tall: big range for its roof gun",
++	},
++	"room_block": {
++		"name": "Block", "long": "Room Block", "cost": 140, "time": 18.0, "hp": 3000.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2, 2), "model": "room_block", "capacity": 4, "pop": 3, "slot_bonus": 0.4,
++		"floor_cost": 100, "floor_time": 16.0, "max_floors": 4, "unlock": 3,
++		"hint": "Drag it, turn the handle, then tick", "about": "Stack it up to 4 storeys  ·  windows for soldiers",
++	},
++	"stairs": {
++		"name": "Stairs", "long": "Stair Tower", "cost": 55, "time": 8.0, "hp": 1400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.1, 1.1), "model": "stairs_tower", "unlock": 3,
++		"hint": "Put it beside a roof or a fortified wall", "about": "The way up to roofs and walkways",
++	},
++	"bridge": {
++		"name": "Bridge", "long": "Roof Bridge", "per_m": 9, "time_per_m": 1.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"model": "roof_bridge", "unlock": 3, "max_len": 16.0,
++		"hint": "Tap a roof, walkway or stair top, then another", "about": "Links roofs, walls and stairs up high",
++	},
++	"helipad": {
++		"name": "Helipad", "long": "Helipad", "cost": 250, "time": 24.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3, 3), "model": "helipad", "unlock": 5, "heli": "huey", "heli_cost": 255,
++		"hint": "Drag it, turn the handle, then tick", "about": "Buy a Huey here: rescue, patrol, resupply",
++	},
++	"helipad_large": {
++		"name": "Big Pad", "long": "Large Helipad", "cost": 440, "time": 34.0, "hp": 4200.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(6, 6), "model": "helipad_large", "unlock": 7, "heli": "mi8", "heli_cost": 470,
++		"hint": "Drag it, turn the handle, then tick", "about": "Buy the Mi-8 here: carries twice as much",
++	},
++	"ammo_point": {
++		"name": "Ammo Pt", "long": "Ammo Point", "cost": 25, "time": 3.0, "hp": 150.0, "blocks": true, "zcost": 4.0,
++		"ground": true, "trench": false, "line": false, "model": "ammo_point", "store": 8,
++		"hint": "Tap to place a crate stash near your guns", "about": "Holds 8 crates. Shorter loader trips",
++	},
++	"radio": {
++		"name": "Radio", "long": "Radio Mast", "cost": 75, "time": 8.0, "hp": 220.0, "blocks": true, "zcost": 4.0,
++		"ground": true, "trench": false, "line": false, "model": "radio_mast",
++		"hint": "Tap to place a radio mast", "about": "More survivors come each wave",
++	},
++	"fuel": {
++		"name": "Fuel", "long": "Fuel Tank", "cost": 40, "time": 4.0, "hp": 140.0, "blocks": true, "zcost": 4.0,
++		"ground": true, "trench": false, "line": false, "model": "fuel_tank",
++		"hint": "Tap to place. Flame bunkers within 14 m can fire", "about": "Feeds flame bunkers. Explodes if hit hard",
++	},
++	"bastion": {
++		"name": "Bastion", "long": "Wood Bastion", "cost": 100, "time": 14.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.5, 1.2), "model": "bastion_wood", "capacity": 2, "slot_bonus": 0.35, "card_only": true,
++		"about": "1 gun on top  ·  2 soldier ports",
++	},
++	"bastion_c": {
++		"name": "Bastion", "long": "Concrete Bastion", "cost": 185, "time": 24.0, "hp": 6500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.5, 1.3), "model": "bastion_concrete", "capacity": 2, "slot_bonus": 0.45, "card_only": true,
++		"about": "1 gun on top  ·  2 soldier ports",
++	},
++	"fence": {
++		"name": "Fence", "long": "Garden Fence", "per_m": 4, "claim_per_m": 1.2, "time_per_m": 0.4, "hp_per_m": 90.0,
++		"blocks": true, "linear": true, "thick": 0.3, "height": 1.85, "model": "suburb/fence_wood", "slot_bonus": 0.15,
++		"bastion": "bastion", "card_only": true, "about": "Weak, but it's a wall",
++	},
++	"picket": {
++		"name": "Picket", "long": "Picket Fence", "per_m": 3, "claim_per_m": 1.2, "time_per_m": 0.4, "hp_per_m": 70.0,
++		"blocks": true, "linear": true, "thick": 0.25, "height": 1.1, "model": "suburb/fence_picket", "slot_bonus": 0.1,
++		"bastion": "bastion", "card_only": true, "about": "The weakest fence",
++	},
++	"hedge": {
++		"name": "Hedge", "long": "Hedge", "per_m": 4, "claim_per_m": 1.8, "time_per_m": 0.5, "hp_per_m": 150.0,
++		"blocks": true, "linear": true, "thick": 0.9, "height": 1.6, "model": "suburb/hedge", "slot_bonus": 0.12,
++		"bastion": "bastion", "card_only": true, "about": "Thick and thorny",
++	},
++	"brickwall": {
++		"name": "Garden Wall", "long": "Garden Wall", "per_m": 6, "claim_per_m": 2.5, "time_per_m": 0.6, "hp_per_m": 240.0,
++		"blocks": true, "linear": true, "thick": 0.35, "height": 1.0, "model": "suburb/garden_wall_brick", "slot_bonus": 0.1,
++		"bastion": "bastion", "card_only": true, "about": "Low brick wall. The toughest garden boundary",
++	},
++	"nest": {
++		"name": "Nest", "long": "Wall Nest", "cost": 25, "time": 4.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"model": "wall_mount_nest", "card_only": true, "about": "Sandbag nest on the wall top",
++	},
++	"spikes": {
++		"name": "Spikes", "long": "Spike Trap", "cost": 40, "time": 3.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": true, "line": false, "model": "spike_trap",
++		"hint": "Tap to place. Double damage in a trench", "about": "Hurts all on it",
++	},
++	"mine": {
++		"name": "Mine", "long": "Mine", "cost": 35, "time": 2.5, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": true, "line": false, "model": "mine",
++		"hint": "Tap to place a mine", "about": "One big blast",
++	},
++	"dig": {
++		"name": "Dig", "long": "Trench", "cost": 5, "time": 3.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": false, "line": true, "model": "",
++		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
++	},
++	"car_wreck": {
++		"name": "Car", "long": "Car Wreck", "cost": 35, "time": 6.0, "hp": 1500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.0, 2.45), "model": "suburb/car_sedan_wreck",
++		"hint": "Drag it, turn the handle, then tick", "about": "Junk barricade. Plug a gap or wall in with cars",
++	},
++	"van_wreck": {
++		"name": "Van", "long": "Van Wreck", "cost": 55, "time": 8.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.49, 3.25), "model": "suburb/van_wreck",
++		"hint": "Drag it, turn the handle, then tick", "about": "Heavier junk barricade",
++	},
++	"bus_wreck": {
++		"name": "Bus", "long": "School Bus Wreck", "cost": 120, "time": 14.0, "hp": 6000.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.54, 6.3), "model": "suburb/school_bus_wreck", "unlock": 3,
++		"hint": "Drag it, turn the handle, then tick", "about": "12 m of steel. A wall in one go",
++	},
++	"decoy": {
++		"name": "Decoy", "long": "Noise Decoy", "cost": 60, "time": 5.0, "hp": 1200.0, "blocks": true, "zcost": 6.0,
++		"ground": true, "trench": false, "line": false, "model": "decoy", "unlock": 3, "lure": 30.0,
++		"hint": "Tap to place. Zombies go for it first", "about": "Lures the horde. Ring it with mines",
++	},
++	"greenhouse": {
++		"name": "Farm", "long": "Greenhouse", "cost": 150, "time": 20.0, "hp": 1800.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.5, 1.5), "model": "greenhouse", "unlock": 2, "income": 45,
++		"hint": "Drag it, turn the handle, then tick", "about": "+45 supplies after every wave it survives",
++	},
++	"clinic": {
++		"name": "Clinic", "long": "Clinic", "cost": 130, "time": 20.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.0, 1.5), "model": "clinic", "unlock": 3, "heal": 5.0, "heal_range": 14.0,
++		"hint": "Drag it, turn the handle, then tick", "about": "Heals everyone within 14 m",
++	},
++	"fort_wood": {
++		"name": "Wood Fort", "long": "Wooden Fort Module", "cost": 25, "time": 4.0, "hp": 700.0, "hp_per_level": 700.0,
++		"raise_cost": 30, "raise_time": 6.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true,
++		"ground": true, "trench": false, "line": true, "model": "fort_wood", "slot_bonus": 0.15,
++		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
++	},
++	"fort_concrete": {
++		"name": "Concrete", "long": "Concrete Fort Module", "cost": 45, "time": 7.0, "hp": 1600.0, "hp_per_level": 1600.0,
++		"raise_cost": 55, "raise_time": 10.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true, "unlock": 3,
++		"ground": true, "trench": false, "line": true, "model": "fort_concrete", "slot_bonus": 0.15,
++		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
++	},
++	"water_tower": {
++		"name": "Water Tw", "long": "Water Tower", "cost": 200, "time": 22.0, "hp": 2200.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.5, 1.5), "model": "water_tower", "slot_bonus": 0.8, "unlock": 4,
++		"hint": "Drag it, turn the handle, then tick", "about": "11 m perch: its gun gets +80% range",
++	},
++	"container": {
++		"name": "Container", "long": "Shipping Container", "cost": 70, "time": 10.0, "hp": 3500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3.0, 1.25), "model": "container", "slot_bonus": 0.25, "unlock": 2,
++		"hint": "Drag it, turn the handle, then tick", "about": "Steel box fort piece  ·  1 roof gun slot",
++	},
++	"pillbox": {
++		"name": "Pillbox", "long": "Concrete Pillbox", "cost": 140, "time": 16.0, "hp": 4500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.6, 1.6), "model": "pillbox", "capacity": 3, "unlock": 3,
++		"hint": "Drag it, turn the handle, then tick", "about": "3 soldiers fire from the slits  ·  very tough",
++	},
++	"outpost": {
++		"name": "Outpost", "long": "Scavenger Outpost", "cost": 120, "time": 12.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.0, 2.0), "model": "outpost", "capacity": 2, "slot_bonus": 0.2, "unlock": 2,
++		"site_range": 14.0, "income": 40, "scrap_take": 40, "goal": true,
++		"hint": "Drag it next to a scrap site, turn the handle, then tick", "about": "Income every wave  ·  zombies go for it",
++	},
++	"armory": {
++		"name": "Armory", "long": "Armory", "cost": 160, "time": 20.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.0, 1.5), "model": "armory", "unlock": 4,
++		"hint": "Drag it, turn the handle, then tick", "about": "All soldiers do +25% damage",
++	},
++	"scrapyard": {
++		"name": "Scrapyard", "long": "Scrapyard", "cost": 110, "time": 16.0, "hp": 1600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.5, 2.0), "model": "scrapyard", "unlock": 2,
++		"hint": "Drag it, turn the handle, then tick", "about": "Fetchers' hauls +50%  ·  scrap piles refill faster",
++	},
++	"lamp": {
++		"name": "Lamp", "long": "Street Lamp", "cost": 10, "time": 2.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": false, "line": false, "model": "suburb/streetlight", "decor": true,
++		"hint": "Tap to place", "about": "Decoration",
++	},
++	"bench": {
++		"name": "Bench", "long": "Bench", "cost": 5, "time": 1.5, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": false, "line": false, "model": "suburb/bench", "decor": true,
++		"hint": "Tap to place", "about": "Decoration",
++	},
++	"tree": {
++		"name": "Tree", "long": "Tree", "cost": 15, "time": 3.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": false, "line": false, "model": "suburb/tree_oak", "decor": true, "scale": 0.5,
++		"hint": "Tap to plant", "about": "Decoration",
++	},
++	"bush": {
++		"name": "Bush", "long": "Bush", "cost": 5, "time": 1.5, "hp": 0.0, "blocks": false, "zcost": 1.0,
++		"ground": true, "trench": false, "line": false, "model": "suburb/bush_a", "decor": true,
++		"hint": "Tap to plant", "about": "Decoration",
++	},
++	"swings": {
++		"name": "Swings", "long": "Swings", "cost": 20, "time": 4.0, "hp": 0.0, "blocks": false, "zcost": 1.0, "size": 2,
++		"ground": true, "trench": false, "line": false, "model": "suburb/playground_swings", "decor": true,
++		"hint": "Tap to place", "about": "Decoration",
++	},
++	"trampoline": {
++		"name": "Bounce", "long": "Trampoline", "cost": 20, "time": 4.0, "hp": 0.0, "blocks": false, "zcost": 1.0, "size": 2,
++		"ground": true, "trench": false, "line": false, "model": "suburb/trampoline", "decor": true,
++		"hint": "Tap to place", "about": "Decoration",
++	},
++}
++const TABS := [
++	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]},
++	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
++	{"id": "base", "name": "Buildings", "tools": ["outpost", "house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
++	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
++	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
++	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
++]
++const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon", "concrete", "wall", "gate", "platform", "wire",
++	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
++	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
++	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
++	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete", "outpost"]
++const MAP_BUILDINGS := {
++	"house_two_storey": {
++		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
++		"capacity": 4, "pop": 4, "slot_bonus": 0.3, "about": "+4 people  ·  windows  ·  a gun slot on the garage roof",
++	},
++	"house_bungalow": {
++		"name": "Bungalow", "long": "Bungalow", "claim": 45, "claim_time": 16.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
++		"capacity": 3, "pop": 3, "slot_bonus": 0.25, "about": "+3 people  ·  windows  ·  a gun slot on the porch",
++	},
++	"house_modern": {
++		"name": "House", "long": "Modern House", "claim": 55, "claim_time": 18.0, "hp": 3200.0, "blocks": true, "zcost": 6.0,
++		"capacity": 4, "pop": 4, "slot_bonus": 0.35, "about": "+4 people  ·  2 gun slots on the terrace",
++	},
++	"corner_shop": {
++		"name": "Shop", "long": "Corner Shop", "claim": 70, "claim_time": 20.0, "hp": 3600.0, "blocks": true, "zcost": 6.0,
++		"capacity": 4, "slot_bonus": 0.4, "about": "Flat roof: 2 gun slots",
++	},
++	"petrol_station": {
++		"name": "Petrol", "long": "Petrol Station", "claim": 60, "claim_time": 20.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"capacity": 2, "slot_bonus": 0.5, "about": "Gun slots on the canopy",
++	},
++	"garage_detached": {
++		"name": "Garage", "long": "Garage", "claim": 25, "claim_time": 8.0, "hp": 1600.0, "blocks": true, "zcost": 6.0,
++		"capacity": 1, "slot_bonus": 0.25, "about": "A gun slot on the roof",
++	},
++}
++const MAPS := [
++	{"id": "fields", "name": "Fields", "about": "Open farmland. The first map", "ready": true},
++	{"id": "suburb", "name": "Suburb", "about": "Streets, houses to claim, a petrol station", "ready": true},
++	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
++	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
++]
++const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
++	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard", "outpost"]
++const GUNS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]
++const SOLDIER_MAX := 40
++const SOLDIER_HP := 70.0
++const SOLDIER_RANGE := 14.0
++const SOLDIER_DAMAGE := 13.0
++const SOLDIER_INTERVAL := 0.95
++const MORTAR_MIN := 8.0
++const MORTAR_MAX := 30.0
++const MORTAR_RELOAD := 2.6
++const MORTAR_RADIUS := 3.0
++const MORTAR_DAMAGE := 80.0
++const SNIPER_RANGE := 36.0
++const SNIPER_DAMAGE := 140.0
++const SNIPER_INTERVAL := 2.2
++const FLAME_RANGE := 7.5
++const FLAME_ANGLE := 0.5
++const FLAME_DPS := 32.0
++const BURN_DPS := 11.0
++const BURN_TIME := 3.0
++const WIRE_SLOW := 0.33
++const WIRE_WEAR := 7.0
++const TURRET_RANGE := 13.0
++const TURRET_RATE := 6.0
++const TURRET_DAMAGE := 6.0
++const CANNON_RANGE := 16.0
++const CANNON_INTERVAL := 0.7
++const CANNON_DAMAGE := 34.0
++const CANNON_SPLASH := 1.8
++const CANNON_SPLASH_DAMAGE := 16.0
++const SPIKE_INTERVAL := 0.5
++const SPIKE_DAMAGE := 14.0
++const MINE_RADIUS := 4.0
++const MINE_DAMAGE := 170.0
++const Z_WALKER := 0
++const Z_RUNNER := 1
++const Z_BRUTE := 2
++const REFUND_BUILT := 0.5
++const REPAIR_COST := 0.4
++const Z_HP_GROWTH := 0.38
++const Z_HP_LATE := 0.05
++const Z_HP := [33.0, 23.0, 330.0]
++const Z_DMG := [7.0, 5.0, 40.0]
++const WALKER_DMG := 7.0
++const REWARD := [1, 2, 18]
++const WAVE_BONUS_BASE := 50
++const WAVE_BONUS_PER := 15
++const BONUS_FREE_PEOPLE := 10
++const BONUS_PER_PERSON := 25
++const BONUS_PER_CLAIM := 40
++
++static func z_hp_scale(w: int) -> float:
++	var late := maxi(0, w - 4)
++	return 1.0 + Z_HP_GROWTH * (w - 1) + Z_HP_LATE * late * late
++
++static func cell_center(c: Vector2i) -> Vector3:
++	return Vector3((c.x + 0.5) * CELL - HALF, 0.0, (c.y + 0.5) * CELL - HALF)
++
++static func world_to_cell(p: Vector3) -> Vector2i:
++	return Vector2i(floori((p.x + HALF) / CELL), floori((p.z + HALF) / CELL))
++
++static func hq_center() -> Vector3:
++	return cell_center(HQ_ORIGIN + Vector2i(1, 1))
++
++static func world_to_nav(p: Vector3) -> Vector2i:
++	return Vector2i(floori((p.x + HALF) / NAV), floori((p.z + HALF) / NAV))
++
++static func nav_center(n: Vector2i) -> Vector3:
++	return Vector3((n.x + 0.5) * NAV - HALF, 0.0, (n.y + 0.5) * NAV - HALF)
++
++static func nav_to_build(n: Vector2i) -> Vector2i:
++	return Vector2i(n.x / 2, n.y / 2)
++
++static func gun_def(kind: String) -> bool:
++	return GUNS.has(kind)
++
++static func is_prefab(kind: String) -> bool:
++	return bool(BUILD.get(kind, {}).get("prefab", false))
++
++static func gun_range(kind: String) -> float:
++	match kind:
++		"turret":
++			return TURRET_RANGE
++		"cannon":
++			return CANNON_RANGE
++		"mortar":
++			return MORTAR_MAX
++		"sniper":
++			return SNIPER_RANGE
++		"flame":
++			return FLAME_RANGE
++		"garrison":
++			return SOLDIER_RANGE + 2.0
++	return 0.0
 diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
 --- a/scripts/fetcher.gd	2026-10-24 19:02:37.756064080 +0000
 +++ b/scripts/fetcher.gd	2026-10-25 01:15:43.088363045 +0000
@@ -1745,7 +2228,7 @@ diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
  		s.refresh()
 diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-25 07:40:28.743957377 +0000
++++ b/scripts/main.gd	2026-10-25 08:08:36.618273067 +0000
 @@ -26,6 +26,16 @@
  var phase := "title"
  var phase_t := 0.0
@@ -1785,7 +2268,23 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	var args := OS.get_cmdline_user_args()
  	for a in args:
  		_dev_arg(a)
-@@ -768,7 +786,10 @@
+@@ -699,7 +717,7 @@
+ 	decor.name = "Decor"
+ 	add_child(decor)
+ 	decor.setup(grid, 1337, G.map_id == "fields")
+-	Art.use_lawn(G.map_id == "suburb")
++	Art.use_lawn(G.map_id == "suburb" or G.map_id == "city")
+ 	terrain.setup(grid)
+ 	G.terrain = terrain
+ 	flow = FlowField.new(grid)
+@@ -763,12 +781,15 @@
+ 	add_child(logi)
+ 	G.logi = logi
+ 	logi.setup(decor.salvage_spots())
+-	if G.map_id == "suburb":
+-		var mb := MapBuilder.new()
++	if G.map_id == "suburb" or G.map_id == "city":
++		var mb: MapBuilder = CityBuilder.new() if G.map_id == "city" else MapBuilder.new()
  		mb.name = "Map"
  		add_child(mb)
  		G.map = mb
@@ -1793,7 +2292,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 +		map_seed = G.rng.randi()
 +		if not G.resume.is_empty():
 +			map_seed = int(G.resume.get("seed", map_seed))
-+		mb.build(SuburbLayout.data(), map_seed)
++		mb.build(CityLayout.data() if G.map_id == "city" else SuburbLayout.data(), map_seed)
  		people.ruins = mb.survivor_points()
  	cam = CameraRig.new()
  	cam.name = "Camera"
@@ -2079,6 +2578,2745 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	builder.set_tool("")
  	builder.select(null)
  	_queue.clear()
+diff -ruN src_orig/scripts/main.gd.orig src/scripts/main.gd.orig
+--- a/scripts/main.gd.orig	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/main.gd.orig	2026-10-25 07:40:28.743957377 +0000
+@@ -0,0 +1,1730 @@
++extends Node3D
++signal wave_started(n: int)
++signal wave_cleared(n: int)
++const EDGE_NAMES := ["north", "east", "south", "west"]
++var grid: Grid
++var flow: FlowField
++var terrain: Terrain
++var decor: Decor
++var buildings: BuildingManager
++var workers: WorkerManager
++var soldiers: SoldierManager
++var people: PeopleManager
++var logi: Logistics
++var walls: WallSystem
++var zones: ZoneMap
++var zombies: ZombieManager
++var fx: Fx
++var cam: CameraRig
++var builder: BuildController
++var hud: Hud
++var sfx: Node
++var sun: DirectionalLight3D
++var world_env: WorldEnvironment
++var supplies := Defs.START_SUPPLIES
++var wave := 1
++var phase := "title"
++var phase_t := 0.0
++var waves_cleared := 0
++var repair_spent := 0
++var map_seed := 0
++# Player difficulty settings (Settings card), kept in settings.cfg.
++const SPEED_CHOICES := [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]
++const HORDE_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
++const SPAWN_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
++var zombie_speed := 1.0
++var horde_mult := 1.0
++var spawn_rate := 1.0
++var _save_t := 0.0
++var test_mode := false
++var manual_clock := false
++var _queue: Array = []
++var _spawn_t := 0.0
++var _spawn_gap := 1.0
++var _edges: Array = []
++var _edge_markers: Array[MeshInstance3D] = []
++var quality: QualityManager
++var _last_ui_size := Vector2i.ZERO
++var _ui_ratio := 0.0
++var _straggle_t := 0.0
++var _stall_t := 0.0
++var _stall_n := -1
++var _wave_t := 0.0
++var _zones_ready := false
++var _amb_t := 0.0
++const START_RING := [
++	Vector3(-9, 0, -11), Vector3(9, 0, -11), Vector3(12, 0, -6), Vector3(12, 0, 8),
++	Vector3(8, 0, 12), Vector3(-8, 0, 12), Vector3(-12, 0, 8), Vector3(-12, 0, -6),
++]
++const GOAL_TEXT := "Wall in your HQ to make a safe zone"
++
++func _ready() -> void:
++	G.reset()
++	G.main = self
++	_load_game_settings()
++	if not G.resume.is_empty():
++		G.map_id = String(G.resume["map"])
++	for a in OS.get_cmdline_user_args():
++		if a.begins_with("--map="):
++			G.map_id = a.substr(6)
++		elif a.begins_with("--uiscale="):
++			_ui_ratio = float(a.substr(10))
++	G.rng.randomize()
++	_setup_world()
++	_plan_edges()
++	get_viewport().size_changed.connect(_update_ui_scale)
++	_update_ui_scale()
++	if test_mode:
++		phase = "build"
++		phase_t = 9999.0
++		hud.show_title(false)
++	else:
++		phase = "title"
++		hud.show_title(true)
++		cam.focus(Defs.hq_center() + Vector3(0, 0, 6), 46.0)
++		cam.snap()
++	if not G.resume.is_empty() and not test_mode:
++		var d: Dictionary = G.resume
++		G.resume = {}
++		_continue(d)
++	hud.save_info = SaveGame.summary() if not test_mode else {}
++	var args := OS.get_cmdline_user_args()
++	for a in args:
++		_dev_arg(a)
++	for a in args:
++		if a.begins_with("--shot="):
++			_showcase(a.substr(7))
++		elif a.begins_with("--quickshot="):
++			_quickshot(a.substr(12))
++		elif a.begins_with("--mapshot="):
++			_mapshot(a.substr(10))
++		elif a.begins_with("--uishots="):
++			_uishots(a.substr(10))
++		elif a == "--bench":
++			_bench(300)
++		elif a.begins_with("--bench="):
++			_bench(int(a.substr(8)))
++		elif a.begins_with("--prof="):
++			_profile(int(a.substr(7)))
++		elif a.begins_with("--fxshots="):
++			_fxshots(a.substr(10))
++		elif a.begins_with("--heroshot="):
++			_heroshot(a.substr(11))
++		elif a.begins_with("--fortshot="):
++			_fortshot(a.substr(11))
++
++func _dev_arg(a: String) -> void:
++	var e: Environment = world_env.environment
++	if not a.contains("="):
++		return
++	var k := a.get_slice("=", 0)
++	var v := a.get_slice("=", 1).to_float()
++	match k:
++		"--glow":
++			e.glow_enabled = v > 0.0
++		"--adj":
++			e.adjustment_enabled = v > 0.0
++		"--sun":
++			sun.light_energy = v
++		"--amb":
++			e.ambient_light_energy = v
++		"--fog":
++			e.fog_density = v
++			e.fog_enabled = v > 0.0
++		"--tm":
++			e.tonemap_mode = int(v)
++		"--exp":
++			e.tonemap_exposure = v
++		"--white":
++			e.tonemap_white = v
++
++func _quickshot(path: String) -> void:
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 5000
++	wave = 6
++	var hq := Defs.HQ_ORIGIN
++	buildings.place_built("turret", hq + Vector2i(-3, -2))
++	buildings.place_built("turret", hq + Vector2i(4, -2))
++	buildings.place_built("mortar", hq + Vector2i(-3, 3))
++	var plan := [{"pos": Vector3(-30, 0, -20), "type": "", "seg": null}, {"pos": Vector3(-14, 0, -28), "type": "", "seg": null}, {"pos": Vector3(4, 0, -26), "type": "", "seg": null}]
++	walls.add_plan("concrete", plan, false)
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in 12:
++		zombies.spawn(Defs.Z_WALKER, Defs.hq_center() + Vector3(-12 + i * 2.0, 0, -34))
++	people.spawn_group(Defs.hq_center() + Vector3(20, 0, 20), 4)
++	for i in 30:
++		sim_step(1.0 / 30.0)
++	cam.focus(Defs.hq_center() + Vector3(0, 0, -6), 44.0)
++	cam.snap()
++	builder.select(buildings.hq)
++	for i in 8:
++		await get_tree().process_frame
++	await _shot(path)
++	get_tree().quit()
++
++func _mapshot(dir: String) -> void:
++	DirAccess.make_dir_recursive_absolute(dir)
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 5000
++	for i in 30:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	var spots := [["01_park", Vector3(0, 0, 4), 40.0], ["02_crossroads", Vector3(34, 0, 26), 40.0], ["03_elm", Vector3(-50, 0, -36), 40.0],
++		["04_close", Vector3(0, 0, 58), 40.0], ["05_petrol", Vector3(46, 0, 12), 30.0], ["06_wide", Vector3(0, 0, 0), 92.0]]
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q * 0.85)
++	walls.build_ring("wall", ring)
++	walls.build_gate_now(c + Vector3(0, 0, 12.0 * 0.85))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-3, -2))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(4, -2))
++	buildings.place_built("mortar", Defs.HQ_ORIGIN + Vector2i(3, 3))
++	for mb in G.map.buildings:
++		if mb.kind == "house_bungalow" and mb.position.distance_to(c) < 30.0:
++			mb._claimed()
++			buildings.mount(mb, 0, "turret", false, true)
++	for i in 8:
++		people.spawn_civilian(c + Vector3(-3 + i * 0.7, 0, 6), true)
++	for i in 3:
++		people.add_job("loader")
++	people.add_job("fetcher")
++	people.add_job("fetcher")
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in 600:
++		sim_step(1.0 / 30.0)
++	_edges = [0, 3]
++	start_wave()
++	for i in 1500:
++		sim_step(1.0 / 30.0)
++		if i % 100 == 0:
++			await get_tree().process_frame
++	spots.append(["07_hero", Vector3(-12, 0, -12), 62.0])
++	for sp in spots:
++		cam.focus(sp[1], sp[2])
++		cam.snap()
++		for i in 8:
++			await get_tree().process_frame
++		if String(sp[0]) == "07_hero":
++			hud.hide_card()
++		await _shot(dir + "/" + String(sp[0]) + ".png")
++	get_tree().quit()
++
++func _bench(n: int) -> void:
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	var c := Defs.hq_center()
++	if OS.get_cmdline_user_args().has("--fort"):
++		wave = 9
++		zombies.wave = 9
++		var f := build_fortress()
++		for i in 300:
++			sim_step(1.0 / 30.0)
++		if f["pad"] and f["pad"].heli:
++			f["pad"].heli.start_patrol(c + Vector3(0, 0, -30))
++	else:
++		var ring: Array[Vector3] = []
++		for q in START_RING:
++			ring.append(c + q * 1.4)
++		walls.build_ring("concrete", ring)
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in n:
++		var a := TAU * i / n
++		var d := 24.0 + (i % 23) * 3.2
++		zombies.spawn(Defs.Z_RUNNER if i % 9 == 0 else Defs.Z_WALKER, c + Vector3(cos(a), 0, sin(a)) * d)
++	cam.focus(c + Vector3(0, 0, 4), 46.0)
++	cam.snap()
++	for i in 60:
++		await get_tree().process_frame
++	var t0 := Time.get_ticks_usec()
++	var frames := 0
++	var zsum := 0
++	var ssum := 0.0
++	while frames < 300:
++		var s0 := Time.get_ticks_usec()
++		await get_tree().process_frame
++		ssum += 0.0
++		zsum += zombies.step_usec
++		frames += 1
++	var total := (Time.get_ticks_usec() - t0) / 1000.0
++	if OS.get_cmdline_user_args().has("--fortdebug"):
++		var counts := {}
++		for node in [walls, buildings, G.helis, people, zombies, decor, fx]:
++			if node:
++				counts[node.name] = node.find_children("*", "MeshInstance3D", true, false).filter(func(m): return m.is_visible_in_tree()).size()
++		print("BENCH visible meshes by group: ", counts)
++	print("BENCH map %s: %d frames, %.2f ms a frame (%.0f fps), %d zombies alive (%d in view), zombie update %.2f ms, draw calls %d" % [
++		G.map_id, frames, total / frames, 1000.0 * frames / total, zombies.alive_count, zombies.near_count, zsum / 1000.0 / frames,
++		int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))])
++	get_tree().quit()
++
++func _profile(n: int) -> void:
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	manual_clock = true
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q * 1.4)
++	walls.build_ring("concrete", ring)
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-4, -4))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, -4))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, 5))
++	buildings.place_built("mortar", Defs.HQ_ORIGIN + Vector2i(-4, 5))
++	for i in 6:
++		people.spawn_civilian(c + Vector3(-3 + i, 0, 5), true)
++	for i in 4:
++		people.add_job("soldier")
++	people.add_job("loader")
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	cam.focus(c, 46.0)
++	cam.snap()
++	for i in n:
++		var a := TAU * i / n
++		var d := 24.0 + (i % 23) * 3.2
++		var z = zombies.spawn(Defs.Z_RUNNER if i % 9 == 0 else Defs.Z_WALKER, c + Vector3(cos(a), 0, sin(a)) * d)
++		z.hp = 100000.0
++		z.max_hp = 100000.0
++	var parts := {"zones": 0, "flow": 0, "zombies": 0, "walls": 0, "buildings": 0, "workers": 0, "soldiers": 0, "people": 0, "fx": 0}
++	var dt := 1.0 / 30.0
++	for i in 30:
++		sim_step(dt)
++	zombies.prof = PackedInt64Array([0, 0, 0, 0, 0])
++	var steps := 150
++	for i in steps:
++		G.sim_time += dt
++		var t := Time.get_ticks_usec()
++		zones.update(3000)
++		var t1 := Time.get_ticks_usec()
++		parts["zones"] += t1 - t
++		flow.update(3000)
++		var t2 := Time.get_ticks_usec()
++		parts["flow"] += t2 - t1
++		zombies.step(dt)
++		var t3 := Time.get_ticks_usec()
++		parts["zombies"] += t3 - t2
++		walls.step(dt)
++		var t4 := Time.get_ticks_usec()
++		parts["walls"] += t4 - t3
++		buildings.step(dt)
++		var t5 := Time.get_ticks_usec()
++		parts["buildings"] += t5 - t4
++		workers.step(dt)
++		var t6 := Time.get_ticks_usec()
++		parts["workers"] += t6 - t5
++		soldiers.step(dt)
++		var t7 := Time.get_ticks_usec()
++		parts["soldiers"] += t7 - t6
++		people.step(dt)
++		var t8 := Time.get_ticks_usec()
++		parts["people"] += t8 - t7
++		fx.step(dt)
++		parts["fx"] += Time.get_ticks_usec() - t8
++	var total := 0.0
++	var line := ""
++	for k in parts:
++		var ms: float = parts[k] / 1000.0 / steps
++		total += ms
++		line += "  %s %.2f" % [k, ms]
++	print("PROF %d zombies (%d in view, tiers %s): %.2f ms a step |%s" % [zombies.alive_count, zombies.near_count, str(zombies.tier_counts), total, line])
++	var zp := zombies.prof
++	print("PROF zombies: buckets %.2f  separation %.2f  danger %.2f  steps %.2f  anims %.2f" % [zp[0] / 1000.0 / steps, zp[1] / 1000.0 / steps, zp[2] / 1000.0 / steps, zp[3] / 1000.0 / steps, zp[4] / 1000.0 / steps])
++	get_tree().quit()
++
++func build_fortress() -> Dictionary:
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q * 1.2)
++	walls.build_ring("fortified", ring)
++	walls.build_gate_now(c + Vector3(0, 0, 12.0 * 1.2))
++	var e0: Vector3 = c + START_RING[7] * 1.2
++	var e3: Vector3 = c + START_RING[5] * 1.2
++	var e1 := Vector3(c.x - 40.0, 0, e0.z)
++	var e2 := Vector3(c.x - 40.0, 0, e3.z)
++	for ab in [[e0, e1], [e1, e2], [e2, e3]]:
++		walls.lay("concrete", ab[0], ab[1], 0, true)
++	walls.refresh_posts()
++	walls.build_gate_now(c + Vector3(-14.4, 0, 1.2))
++	var big: Helipad = buildings.place_rect("helipad_large", c + Vector3(-28.0, 0, 2.0), 0.0, true)
++	var b1: RoomBlock = buildings.place_rect("room_block", c + Vector3(-7.5, 0, -7.2), 0.0, true)
++	var b2: RoomBlock = buildings.place_rect("room_block", c + Vector3(7.5, 0, -7.2), 0.0, true)
++	if b1:
++		b1.finish_floor()
++		b1.finish_floor()
++	if b2:
++		b2.finish_floor()
++	var st: Building = buildings.place_rect("stairs", c + Vector3(-1.6, 0, -11.0), 0.0, true)
++	var pad: Helipad = buildings.place_rect("helipad", c + Vector3(8.5, 0, 7.5), 0.0, true)
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	G.net.dirty = true
++	var br = null
++	if b1 and b2:
++		var a1: Dictionary = G.net.anchor_near(b1.position, b2.position)
++		var a2: Dictionary = G.net.anchor_near(b2.position, b1.position)
++		if not a1.is_empty() and not a2.is_empty():
++			br = buildings.place_bridge(a1, a2, true)
++	G.net.dirty = true
++	for b in [b1, b2]:
++		if b:
++			for i in b.slot_count():
++				buildings.mount(b, i, "turret", false, true)
++	buildings.place_built("mortar", Defs.HQ_ORIGIN + Vector2i(-4, 4))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, 3))
++	var forts: Array = walls.live().filter(func(x): return x.kind == "fortified" and x.state == Building.BUILT)
++	var k := 0
++	for s in forts:
++		if k % 3 == 0 and s.length > 3.0:
++			walls.add_nest(s, s.position, "turret")
++			var n = buildings.last_placed
++			if n and n.state != Building.BUILT:
++				n._finish(true)
++				for g in n.mounted:
++					if g and g.state != Building.BUILT:
++						g._finish(true)
++		k += 1
++	for i in 20:
++		people.spawn_civilian(c + Vector3(-5 + i * 0.5, 0, 4), true)
++	for i in 8:
++		people.add_job("soldier")
++	for i in 12:
++		people.add_job("loader")
++	if big:
++		big.heli = G.helis.add_heli("mi8", big)
++		big.heli.park_now()
++		big.heli.rotor = 0.0
++		if G.sfx:
++			G.sfx.stop_loop(big.heli)
++	if pad:
++		pad.heli = G.helis.add_heli("huey", pad)
++		pad.heli.park_now()
++		pad.heli.rotor = 0.0
++		if G.sfx:
++			G.sfx.stop_loop(pad.heli)
++	for s in forts.slice(0, 4):
++		soldiers.assign(s)
++	return {"b1": b1, "b2": b2, "pad": pad, "big": big, "bridge": br, "stairs": st}
++
++func _fortshot(dir: String) -> void:
++	DirAccess.make_dir_recursive_absolute(dir)
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 4000
++	wave = 9
++	zombies.wave = 9
++	var f := build_fortress()
++	var c := Defs.hq_center()
++	print("FORT zone at HQ door: %d" % people.hq_zone())
++	for i in 1500:
++		sim_step(1.0 / 30.0)
++	if OS.get_cmdline_user_args().has("--fortdebug"):
++		for g in buildings.mounted_guns():
++			print("DBG gun %s on %s crew_ok %s loader %s occ %d inc %d" % [g.kind, g.host.kind if g.host else "-", str(g.crew_ok()), str(g.loader), g.occupants.size(), g.incoming.size()])
++		for l in people.loaders:
++			print("DBG loader mode %d gun %s climbing %s climb %s pos %s path %d/%d air %d/%d vis %s" % [l.mode, str(l.gun), str(l._climbing), str(l._climb.keys()), str(l.position.snapped(Vector3(0.1, 0.1, 0.1))), l.path_i, l.path.size(), l.air_i, l.air_pts.size(), str(l.visible)])
++			if l._climbing:
++				print("DBG   pts ", l.air_pts)
++		for sd in soldiers.soldiers:
++			print("DBG soldier mode %d post %s pos %s" % [sd.mode, str(sd.post.kind if sd.post else "-"), str(sd.position.snapped(Vector3(0.1, 0.1, 0.1)))])
++	hud._toasts.clear()
++	print("FORT zones %d, Mi-8 %s" % [zones.zone_count, str(f["big"] != null and f["big"].heli != null)])
++	cam.focus(c + Vector3(-6, 0, 4), 70.0)
++	cam.snap()
++	for i in 20:
++		await get_tree().process_frame
++	await _shot(dir + "/fortress_v06.png")
++	cam.focus(c + Vector3(0, 0, -6), 24.0)
++	cam.snap()
++	for i in 20:
++		await get_tree().process_frame
++	await _shot(dir + "/blocks_bridge_v06.png")
++	_edges = [0]
++	start_wave()
++	for i in 900:
++		sim_step(1.0 / 30.0)
++		if i % 30 == 0:
++			await get_tree().process_frame
++	var h = f["pad"].heli if f["pad"] else null
++	if h:
++		h.cooldown = 0.0
++		var why_p: String = h.start_patrol(c + Vector3(0, 0, -34))
++		print("FORT patrol: '%s' fly %d" % [why_p, h.fly])
++	for i in 700:
++		sim_step(1.0 / 30.0)
++		if i % 30 == 0:
++			await get_tree().process_frame
++		if h and h.fly == Heli.ORBIT and i > 400:
++			break
++	hud._banners.clear()
++	hud._banner_age = -1.0
++	hud.banner.visible = false
++	hud._toasts.clear()
++	if h:
++		print("FORT heli fly %d at %s" % [h.fly, str(h.position)])
++		var vp: float = cam.pitch_for(38.0)
++		cam.focus(Vector3(h.position.x, 0, h.position.z - h.position.y / tan(vp) + 3.0), 38.0)
++		cam.snap()
++	for i in 6:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	await _shot(dir + "/heli_patrol_v06.png")
++	if OS.get_cmdline_user_args().has("--fortdebug") and h:
++		cam.focus(Vector3(h.position.x, 0, h.position.z), 16.0)
++		cam.snap()
++		print("FORT heli model vis %s xf %s" % [str(h.model.is_visible_in_tree()), str(h.global_transform)])
++		for mi in Art.mesh_instances(h.model):
++			print("FORT  mesh %s vis %s transp %.2f" % [mi.name, str(mi.is_visible_in_tree()), mi.transparency])
++		for i in 4:
++			await get_tree().process_frame
++		await _shot(dir + "/heli_debug.png")
++	get_tree().quit()
++
++func _heroshot(path: String) -> void:
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 3000
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q * 1.05)
++	walls.build_ring("wall", ring)
++	walls.build_gate_now(c + Vector3(0, 0, 12.0 * 1.05))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-4, -3))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, -3))
++	buildings.place_built("mortar", Defs.HQ_ORIGIN + Vector2i(4, 4))
++	for mb in G.map.buildings:
++		if mb.kind == "house_bungalow" and mb.position.distance_to(c) < 30.0:
++			mb._claimed()
++			buildings.mount(mb, 0, "turret", false, true)
++	for i in 10:
++		people.spawn_civilian(c + Vector3(-3 + i * 0.7, 0, 6), true)
++	for i in 4:
++		people.add_job("soldier")
++	people.add_job("loader")
++	people.add_job("loader")
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in 300:
++		sim_step(1.0 / 30.0)
++	wave = 4
++	zombies.wave = 4
++	_edges = [0]
++	start_wave()
++	for i in 2050:
++		sim_step(1.0 / 30.0)
++		if i % 20 == 0:
++			await get_tree().process_frame
++	hud._banners.clear()
++	hud._banner_age = -1.0
++	hud.banner.visible = false
++	hud._toasts.clear()
++	cam.focus(c + Vector3(0, 0, -14), 50.0)
++	cam.snap()
++	for i in 12:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	await _shot(path)
++	print("HERO %d zombies alive" % zombies.alive_count)
++	get_tree().quit()
++
++func _fxshots(dir: String) -> void:
++	DirAccess.make_dir_recursive_absolute(dir)
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 9000
++	walls.auto_rebuild = false
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q)
++	walls.build_ring("wall", ring)
++	walls.build_gate_now(c + Vector3(0, 0, 12.0))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-3, -3))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, -3))
++	for i in 3:
++		people.add_job("soldier")
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in 120:
++		sim_step(1.0 / 30.0)
++	for i in 40:
++		var z = zombies.spawn(Defs.Z_WALKER if i % 8 else Defs.Z_RUNNER, c + Vector3(randf_range(-8, 8), 0, -24 - randf_range(0, 8)))
++		z.hp = 4000.0
++		z.max_hp = 4000.0
++	for i in 300:
++		sim_step(1.0 / 30.0)
++	zombies.damage_radius(c + Vector3(-3, 0, -14), 2.5, 6000.0)
++	fx.explosion(c + Vector3(-3, 0.2, -14), 0.8)
++	fx.fire_patch(c + Vector3(5, 0, -15), 1.8, 30.0)
++	for i in 8:
++		sim_step(1.0 / 30.0)
++	cam.focus(c + Vector3(0, 0, -11), 24.0)
++	cam.snap()
++	for i in 20:
++		await get_tree().process_frame
++	await _shot(dir + "/fx_wall_fight.png")
++	zombies.clear_all()
++	var segs := walls.live().filter(func(x): return x.kind == "wall" and x.state == Building.BUILT)
++	segs.sort_custom(func(a, b): return a.position.x < b.position.x)
++	var west: Array = segs.filter(func(x): return x.position.x < c.x - 9.0)
++	if west.size() >= 3:
++		west[0].take_damage(west[0].max_hp * 0.62)
++		west[1].take_damage(west[1].max_hp * 0.85)
++		west[2].take_damage(1000000000.0)
++	var bp := Defs.HQ_ORIGIN + Vector2i(-4, 3)
++	buildings.place("turret", bp)
++	var tb = grid.occ[grid.idx(bp)]
++	if tb:
++		tb.progress = 0.5
++		tb.build_look()
++	var hs: Building = buildings.place_rect("house", c + Vector3(-22, 0, 4), 0.0, false)
++	if hs:
++		hs.progress = 0.45
++		hs.build_look()
++	var nw: Array = walls.lay("concrete", c + Vector3(-26, 0, -6), c + Vector3(-26, 0, 10), 0, false)
++	for x in nw:
++		x.progress = 0.4
++		x.build_look()
++	for w in workers.workers:
++		w._notice()
++		break
++	for i in 6:
++		sim_step(1.0 / 30.0)
++	cam.focus(c + Vector3(-16, 0, 2), 26.0)
++	cam.snap()
++	for i in 20:
++		await get_tree().process_frame
++	await _shot(dir + "/fx_build_damage.png")
++	get_tree().quit()
++
++func _uishots(dir: String) -> void:
++	DirAccess.make_dir_recursive_absolute(dir)
++	var vsz := get_viewport().get_visible_rect().size
++	var tag := "portrait" if vsz.y > vsz.x else "landscape"
++	for i in 10:
++		await get_tree().process_frame
++	await _shot(dir + "/ui_%s_title.png" % tag)
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 84.0
++	supplies = 1240
++	var c := Defs.hq_center()
++	var ring: Array[Vector3] = []
++	for q in START_RING:
++		ring.append(c + q)
++	walls.build_ring("wall", ring)
++	walls.build_gate_now(c + Vector3(0, 0, 12.0))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-3, -3))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(5, -3))
++	buildings.place_built("mortar", Defs.HQ_ORIGIN + Vector2i(4, 4))
++	for i in 6:
++		people.spawn_civilian(c + Vector3(-3 + i * 0.8, 0, 6), true)
++	people.add_job("soldier")
++	people.add_job("soldier")
++	people.add_job("loader")
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	for i in 240:
++		sim_step(1.0 / 30.0)
++	hud._toasts.clear()
++	hud._gain = 0
++	hud._gain_t = 0.0
++	hud._banners.clear()
++	hud._banner_age = -1.0
++	hud.banner.visible = false
++	var dist := 46.0 if tag == "portrait" else 36.0
++	cam.focus(c + Vector3(0, 0, 3), dist)
++	cam.snap()
++	for i in 30:
++		await get_tree().process_frame
++	await _shot(dir + "/ui_%s_hud.png" % tag)
++	hud.set_tab("build")
++	hud._sheet_open = true
++	await get_tree().create_timer(0.5).timeout
++	await _shot(dir + "/ui_%s_build.png" % tag)
++	hud.set_tab("high")
++	await get_tree().create_timer(0.3).timeout
++	await _shot(dir + "/ui_%s_fortress.png" % tag)
++	hud.close_sheet()
++	await get_tree().create_timer(0.4).timeout
++	var seg = null
++	for s in walls.live():
++		if s.kind == "wall" and s.state == Building.BUILT and s.position.z < c.z - 6.0:
++			seg = s
++			break
++	if seg != null:
++		builder.sel_point = seg.position
++		builder.select(seg)
++		await get_tree().create_timer(0.5).timeout
++		await _shot(dir + "/ui_%s_wall.png" % tag)
++		builder.select(null)
++		await get_tree().create_timer(0.4).timeout
++	var zp := c + Vector3(7, 0, 7)
++	builder.sel_point = zp
++	builder.select(CardModels.ZoneInfo.new(zones.zone_at(zp)))
++	await get_tree().create_timer(0.5).timeout
++	await _shot(dir + "/ui_%s_zone.png" % tag)
++	builder.select(null)
++	await get_tree().create_timer(0.4).timeout
++	builder.sel_point = buildings.hq.position
++	builder.select(buildings.hq)
++	await get_tree().create_timer(0.5).timeout
++	await _shot(dir + "/ui_%s_hq.png" % tag)
++	builder.select(null)
++	await get_tree().create_timer(0.4).timeout
++	builder.select(CardModels.Settings.new())
++	await get_tree().create_timer(0.5).timeout
++	await _shot(dir + "/ui_%s_settings.png" % tag)
++	builder.select(null)
++	await get_tree().create_timer(0.4).timeout
++	_on_tool_pressed("wall")
++	builder.tap(cam.cam.unproject_position(c + Vector3(-16, 0, -14)))
++	builder.tap(cam.cam.unproject_position(c + Vector3(-4, 0, -20)))
++	await get_tree().create_timer(0.5).timeout
++	await _shot(dir + "/ui_%s_tool.png" % tag)
++	get_tree().quit()
++
++func _setup_world() -> void:
++	_setup_env()
++	grid = Grid.new()
++	G.grid = grid
++	terrain = Terrain.new()
++	terrain.name = "Terrain"
++	add_child(terrain)
++	decor = Decor.new()
++	decor.name = "Decor"
++	add_child(decor)
++	decor.setup(grid, 1337, G.map_id == "fields")
++	Art.use_lawn(G.map_id == "suburb")
++	terrain.setup(grid)
++	G.terrain = terrain
++	flow = FlowField.new(grid)
++	if test_mode:
++		flow.fixed_pops = 3000
++	G.flow = flow
++	fx = Fx.new()
++	fx.name = "Fx"
++	add_child(fx)
++	G.fx = fx
++	sfx = Sfx
++	G.sfx = sfx
++	buildings = BuildingManager.new()
++	buildings.name = "Buildings"
++	add_child(buildings)
++	G.buildings = buildings
++	buildings.spawn_hq()
++	zones = ZoneMap.new(grid)
++	if test_mode:
++		zones.fixed_work = 12000
++	G.zones = zones
++	Art.mat_ground.set_shader_parameter("zone_tex", zones.mask_tex)
++	zones.updated.connect(_on_zones_updated)
++	walls = WallSystem.new()
++	walls.name = "Walls"
++	add_child(walls)
++	G.walls = walls
++	var net := ElevatedNet.new()
++	net.name = "Net"
++	add_child(net)
++	G.net = net
++	var helis := HeliManager.new()
++	helis.name = "Helis"
++	add_child(helis)
++	G.helis = helis
++	grid.heal = walls.heal
++	zombies = ZombieManager.new()
++	zombies.name = "Zombies"
++	add_child(zombies)
++	G.zombies = zombies
++	zombies.prewarm(12)
++	zombies.killed.connect(_on_zombie_killed)
++	quality = QualityManager.new()
++	quality.name = "Quality"
++	add_child(quality)
++	workers = WorkerManager.new()
++	workers.name = "Workers"
++	add_child(workers)
++	G.workers = workers
++	soldiers = SoldierManager.new()
++	soldiers.name = "Soldiers"
++	add_child(soldiers)
++	G.soldiers = soldiers
++	people = PeopleManager.new()
++	people.name = "People"
++	add_child(people)
++	G.people = people
++	people.ruins = decor.ruins
++	logi = Logistics.new()
++	logi.name = "Logistics"
++	add_child(logi)
++	G.logi = logi
++	logi.setup(decor.salvage_spots())
++	if G.map_id == "suburb":
++		var mb := MapBuilder.new()
++		mb.name = "Map"
++		add_child(mb)
++		G.map = mb
++		map_seed = G.rng.randi()
++		if not G.resume.is_empty():
++			map_seed = int(G.resume.get("seed", map_seed))
++		mb.build(SuburbLayout.data(), map_seed)
++		people.ruins = mb.survivor_points()
++	cam = CameraRig.new()
++	cam.name = "Camera"
++	add_child(cam)
++	G.cam = cam
++	builder = BuildController.new()
++	builder.name = "Builder"
++	add_child(builder)
++	G.builder = builder
++	hud = Hud.new()
++	hud.name = "Hud"
++	add_child(hud)
++	G.hud = hud
++	zones.compute_now()
++	buildings.refresh_zones()
++	flow.compute_now()
++	_zones_ready = true
++	people.setup_start()
++	hud.tool_pressed.connect(_on_tool_pressed)
++	hud.start_wave_pressed.connect(start_wave)
++	hud.play_pressed.connect(_on_play)
++	hud.continue_pressed.connect(_on_continue)
++	hud.restart_pressed.connect(_on_restart)
++	hud.card_action.connect(_on_card_action)
++	builder.tool_changed.connect(_on_tool_changed)
++	builder.message.connect(func(t):
++		hud.toast(t)
++		_ui("ui_invalid"))
++	builder.plan_changed.connect(_on_plan_changed)
++	hud.plan_undo.connect(func():
++		_ui("ui_cancel")
++		builder.undo_point())
++	hud.confirm_pressed.connect(func():
++		_ui("ui_confirm")
++		builder.confirm())
++	hud.cancel_pressed.connect(func():
++		_ui("ui_cancel")
++		builder.cancel())
++	hud.map_picked.connect(func(id):
++		_ui("ui_tap")
++		if id != G.map_id:
++			G.map_id = id
++			get_tree().reload_current_scene()
++		else:
++			hud.title_card.queue_redraw())
++	hud.settings_pressed.connect(func():
++		_ui("ui_open")
++		builder.select(CardModels.Settings.new()))
++	hud.undo_last_pressed.connect(func():
++		var n: int = builder.undo_last()
++		_ui("ui_cancel" if n > 0 else "ui_invalid")
++		hud.toast("Undone, supplies back" if n > 0 else "Work has started: can't undo"))
++	_make_edge_markers()
++
++func _setup_env() -> void:
++	var e := Environment.new()
++	e.background_mode = Environment.BG_SKY
++	var sky := Sky.new()
++	var sm := ProceduralSkyMaterial.new()
++	sm.sky_top_color = Color(0.22, 0.29, 0.42)
++	sm.sky_horizon_color = Color(0.88, 0.64, 0.44)
++	sm.ground_horizon_color = Color(0.5, 0.4, 0.31)
++	sm.ground_bottom_color = Color(0.13, 0.12, 0.1)
++	sm.sun_angle_max = 25.0
++	sm.sun_curve = 0.1
++	sky.sky_material = sm
++	e.sky = sky
++	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
++	e.ambient_light_energy = 0.62
++	e.ambient_light_sky_contribution = 1.0
++	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
++	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
++	e.tonemap_exposure = 1.05
++	e.fog_enabled = true
++	e.fog_mode = Environment.FOG_MODE_DEPTH
++	e.fog_light_color = Color(0.62, 0.52, 0.44)
++	e.fog_light_energy = 1.0
++	e.fog_density = 0.85
++	e.fog_depth_begin = 70.0
++	e.fog_depth_end = 230.0
++	e.fog_depth_curve = 1.6
++	e.fog_sky_affect = 0.0
++	e.glow_enabled = true
++	e.glow_intensity = 0.55
++	e.glow_strength = 0.9
++	e.glow_bloom = 0.04
++	e.glow_hdr_threshold = 1.1
++	e.adjustment_enabled = true
++	e.adjustment_contrast = 1.06
++	e.adjustment_saturation = 1.08
++	world_env = WorldEnvironment.new()
++	world_env.environment = e
++	add_child(world_env)
++	sun = DirectionalLight3D.new()
++	sun.name = "Sun"
++	sun.rotation_degrees = Vector3(-27.0, -38.0, 0.0)
++	sun.light_color = Color(1.0, 0.77, 0.54)
++	sun.light_energy = 1.45
++	sun.shadow_enabled = true
++	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
++	sun.directional_shadow_max_distance = 80.0
++	sun.shadow_bias = 0.05
++	sun.shadow_normal_bias = 1.2
++	sun.shadow_blur = 1.2
++	add_child(sun)
++
++func _update_ui_scale() -> void:
++	var win := get_window()
++	var ws := Vector2(win.size)
++	if ws.x < 2.0 or ws.y < 2.0:
++		return
++	var ratio := 1.0
++	var insets := [0.0, 0.0, 0.0, 0.0]
++	if OS.has_feature("web"):
++		var v = JavaScriptBridge.eval("window.zdUiScale || window.devicePixelRatio || 1", true)
++		if v != null:
++			ratio = float(v)
++		var s = JavaScriptBridge.eval("JSON.stringify(window.zdSafe ? window.zdSafe() : [0,0,0,0])", true)
++		if s is String:
++			var arr = JSON.parse_string(s)
++			if arr is Array and arr.size() == 4:
++				insets = arr
++	else:
++		ratio = DisplayServer.screen_get_scale()
++	if _ui_ratio > 0.0:
++		ratio = _ui_ratio
++	var f := maxf(1.0, ratio)
++	var short := minf(ws.x, ws.y)
++	if short / f < 360.0:
++		f = short / 360.0
++	if short / f > 900.0:
++		f = short / 900.0
++	f = maxf(f, 0.5)
++	var size := Vector2i(int(ws.x / f), int(ws.y / f))
++	if size != _last_ui_size:
++		_last_ui_size = size
++		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
++		win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
++		win.content_scale_size = size
++	var k := ratio / f
++	hud.set_safe_insets(float(insets[0]) * k, float(insets[1]) * k, float(insets[2]) * k, float(insets[3]) * k)
++
++func spend(n: int) -> bool:
++	if n > supplies:
++		return false
++	supplies -= n
++	return true
++
++func add_supplies(n: int) -> void:
++	supplies += n
++
++func _on_zombie_killed(z) -> void:
++	add_supplies(z.reward)
++
++func _process(dt: float) -> void:
++	if not manual_clock:
++		sim_step(minf(dt, 0.1))
++	_update_hud()
++	quality.tick(dt)
++
++func sim_step(dt: float) -> void:
++	G.sim_time += dt
++	zones.update(3000)
++	flow.update(3000)
++	match phase:
++		"build":
++			phase_t -= dt
++			_save_t -= dt
++			if _save_t <= 0.0:
++				_save_t = 20.0
++				autosave()
++			if phase_t <= 0.0 and not test_mode:
++				start_wave()
++		"wave":
++			_spawn_step(dt)
++			if _queue.is_empty() and zombies.alive_count <= 0:
++				_wave_cleared()
++			elif _queue.is_empty() and zombies.alive_count <= 3:
++				_straggle_t += dt
++				if _straggle_t > 45.0:
++					for z in zombies.alive_list:
++						z.enrage()
++				if _straggle_t > 150.0:
++					for z in zombies.alive_list.duplicate():
++						z.hurt(1000000000.0)
++			else:
++				_straggle_t = 0.0
++			_wave_t += dt
++			if zombies.alive_count != _stall_n or not _queue.is_empty():
++				_stall_n = zombies.alive_count
++				_stall_t = 0.0
++			else:
++				_stall_t += dt
++			if (_stall_t > 120.0 and _stall_t - dt <= 120.0) or (_wave_t > 300.0 and _wave_t - dt <= 300.0):
++				for z in zombies.alive_list:
++					z.enrage()
++			elif _stall_t > 180.0 or (_wave_t > 420.0 and _queue.is_empty() and zombies.alive_count <= maxi(10, wave_size(wave) / 10)):
++				for z in zombies.alive_list.duplicate():
++					z.hurt(1000000000.0)
++	zombies.step(dt)
++	walls.step(dt)
++	buildings.step(dt)
++	G.helis.step(dt)
++	workers.step(dt)
++	soldiers.step(dt)
++	people.step(dt)
++	fx.step(dt)
++	_update_markers()
++
++func _update_hud() -> void:
++	var left := zombies.alive_count + _queue.size()
++	var hq_frac := 0.0
++	if buildings.hq and buildings.hq.state != Building.DEAD:
++		hq_frac = buildings.hq.hp / buildings.hq.max_hp
++	hud.set_state(supplies, wave, phase, maxf(0.0, phase_t), left, hq_frac)
++	hud.set_people(people.population(), people.idle_count(), people.pop_cap())
++	hud.set_crates(logi.crates_total(), logi.capacity_total())
++	var need_goal: bool = phase == "build" and people.hq_zone() == 0 and not test_mode
++	hud.set_goal(GOAL_TEXT if need_goal else "")
++	hud.set_undo_last(builder.undo_t)
++	var anchor: Vector3 = builder.pending_anchor() if builder.has_tool() and builder.has_pending() else Vector3.INF
++	if anchor != Vector3.INF and not cam.cam.is_position_behind(anchor):
++		hud.place_confirm(cam.cam.unproject_position(anchor), true, builder.pending_ok())
++	else:
++		hud.place_confirm(Vector2.ZERO, false, false)
++	_amb_t -= get_process_delta_time()
++	if _amb_t <= 0.0 and G.sfx and phase != "title":
++		_amb_t = 0.5
++		G.sfx.set_ambience(clampf(zombies.alive_count / 60.0, 0.0, 1.0))
++
++func _input(e: InputEvent) -> void:
++	if e is InputEventKey and e.pressed and not e.echo:
++		match e.keycode:
++			KEY_F3:
++				hud.toggle_fps()
++			KEY_ESCAPE:
++				builder.set_tool("")
++			KEY_ENTER, KEY_KP_ENTER:
++				builder.confirm()
++			KEY_BACKSPACE:
++				builder.undo_point()
++			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0:
++				var i: int = 9 if e.keycode == KEY_0 else e.keycode - KEY_1
++				if i < Defs.TOOLS.size():
++					_on_tool_pressed(Defs.TOOLS[i])
++			KEY_X:
++				_on_tool_pressed("remove")
++			KEY_SPACE:
++				if phase == "build":
++					start_wave()
++
++func _on_plan_changed() -> void:
++	var editing: bool = builder.is_wall_tool() or builder.tool == "_reshape"
++	var n: int = builder.plan.size() if builder.is_wall_tool() else builder.rs_hist.size()
++	hud.set_plan(editing, n)
++
++func _ui(name: String) -> void:
++	if G.sfx:
++		G.sfx.play_ui(name)
++
++func _on_tool_pressed(t: String) -> void:
++	if phase == "over" or phase == "title":
++		return
++	_ui("ui_cancel" if t == builder.tool else "ui_tap")
++	var need := int(Defs.BUILD.get(t, {}).get("unlock", 0))
++	if need > wave:
++		hud.toast("Unlocks at wave %d" % need)
++		return
++	builder.set_tool(t)
++
++func _on_card_action(id: String, target) -> void:
++	if id.begins_with("plus:") or id.begins_with("minus:"):
++		var key := id.get_slice(":", 1)
++		if key in ["zspeed", "horde", "spawn"]:
++			_step_setting(key, 1 if id.begins_with("plus:") else -1)
++			return
++	if id.begins_with("plus:"):
++		var job := id.substr(5)
++		var why: String = people.add_job(job)
++		if why != "":
++			hud.toast(why)
++			_ui("ui_invalid")
++		else:
++			_ui("ui_recruit" if job == "soldier" else "ui_assign")
++		return
++	if id.begins_with("minus:"):
++		var why2: String = people.remove_job(id.substr(6))
++		if why2 != "":
++			hud.toast(why2)
++			_ui("ui_invalid")
++		else:
++			_ui("ui_cancel")
++		return
++	if id.begins_with("mount:"):
++		var gun := id.substr(6)
++		var why3 := ""
++		if target is CardModels.SlotPick:
++			if target.seg != null:
++				why3 = walls.add_nest(target.seg, target.point, gun)
++			elif buildings.mount(target.host, target.slot, gun) == null:
++				why3 = "Can't put that there"
++		_card_result(why3, "Workers will build it. A loader or soldier crews it")
++		return
++	var w := builder.sel_point
++	match id:
++		"close":
++			_ui("ui_close")
++			builder.select(null)
++		"sell":
++			_ui("ui_sell")
++			buildings.remove_thing(target)
++			builder.select(null)
++		"assign":
++			if target is Building:
++				var n: int = soldiers.assign(target)
++				if n == 0:
++					hud.toast("No idle soldiers. Give people the Soldier job at the HQ")
++					_ui("ui_invalid")
++				else:
++					_ui("ui_assign")
++		"move", "rotate":
++			_ui("ui_tap")
++			builder.select(null)
++			builder.begin_move(target)
++		"slot":
++			var i: int = target.free_slot()
++			if i >= 0:
++				builder.select(CardModels.SlotPick.new(target, i))
++		"mount":
++			builder.select(CardModels.SlotPick.new(null, -1, target, w if w != Vector3.INF else target.position))
++		"upgrade":
++			_card_result(walls.upgrade_segment(target), "Workers will build concrete. The wood stays up until then")
++		"upgrade_run":
++			_card_result(walls.upgrade_run(target), "Workers will build concrete. The wood stays up until then")
++		"ports":
++			_card_result(walls.add_ports(target), "Workers will cut firing ports")
++		"bastion":
++			_card_result(walls.add_bastion(target, w if w != Vector3.INF else target.position), "Workers will build the bastion")
++		"gate":
++			_card_result(walls.place_gate(w if w != Vector3.INF else target.position, target), "Workers will build the gate")
++		"reshape":
++			_ui("ui_tap")
++			builder.select(null)
++			builder.begin_reshape(target)
++		"upgrade_zone":
++			_card_result(walls.upgrade_zone(target.zone_id), "Workers will build concrete. The wood stays up until then")
++		"expand":
++			_ui("ui_tap")
++			builder.select(null)
++			builder.set_tool("wall")
++			hud.toast("Draw from one wall to another, then tick")
++		"inner_yes":
++			_ui("ui_confirm")
++			walls.remove_inner(target.payload)
++			builder.select(null)
++			hud.toast("Inner wall coming down (half refund)")
++		"inner_no":
++			_ui("ui_close")
++			builder.select(null)
++		"claim":
++			_card_result(target.start_claim(), "Workers will secure it")
++		"cancel_claim":
++			_ui("ui_cancel")
++			target.cancel_claim()
++			builder.select(null)
++		"rebuild":
++			_card_result(walls.rebuild_rubble(target), "Workers will rebuild it")
++		"floor":
++			_card_result(target.add_floor(), "Workers will build the next storey")
++		"buy_heli":
++			_card_result(target.buy_heli(), "It's on its way")
++		"heli_rescue":
++			_ui("ui_tap")
++			builder.heli_pad = target
++			builder.set_tool("_heli_rescue")
++		"heli_patrol":
++			_ui("ui_tap")
++			builder.heli_pad = target
++			builder.set_tool("_heli_patrol")
++		"heli_resupply":
++			var why_r: String = target.heli.start_resupply() if target.heli != null else "No helicopter"
++			_card_result(why_r, "Crates are on their way out")
++		"clear_rubble":
++			_ui("ui_sell")
++			walls.clear_rubble(target)
++			builder.select(null)
++		"auto_rebuild":
++			walls.auto_rebuild = not walls.auto_rebuild
++			_ui("ui_tap")
++			hud.toast("Auto rebuild %s" % ("on" if walls.auto_rebuild else "off"))
++			hud.show_card(target)
++		"clear_house":
++			_card_result(target.start_clear(), "Workers will knock it down")
++		"claim_fence":
++			_card_result(target.claim(), "Workers will make it part of your walls")
++		"sound_test":
++			if OS.has_feature("web"):
++				JavaScriptBridge.eval("window.zdAudioKick && window.zdAudioKick()", true)
++			if G.sfx:
++				G.sfx.play_ui("wave_cleared")
++		"mute":
++			AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
++			hud.settings_btn.queue_redraw()
++		"quality":
++			quality.next_mode()
++			_ui("ui_tap")
++			hud.toast("Graphics: %s" % quality.label())
++		"raise":
++			_card_result(target.raise_one(), "Workers will add a floor")
++		"raise_all":
++			_card_result(target.raise_group(), "Workers will raise the fort")
++		"fps":
++			quality.next_fps()
++			_ui("ui_tap")
++			hud.toast("Frame rate: %s%s" % [quality.fps_label(), "  ·  cooler, longer battery" if quality.fps_cap == 30 else ""])
++
++func _card_result(why: String, ok_text: String) -> void:
++	if why != "":
++		hud.toast(why)
++		_ui("ui_invalid")
++		return
++	_ui("ui_confirm")
++	builder.select(null)
++	hud.toast(ok_text)
++
++func _on_zones_updated(breached: bool, secured: bool) -> void:
++	buildings.refresh_zones()
++	if _zones_ready and phase != "over" and not test_mode:
++		var inner: Array = walls.ready_expansion()
++		if not inner.is_empty():
++			if true:
++				var refund := 0
++				for s in inner:
++					refund += int(round(s.paid * Defs.REFUND_BUILT))
++				builder.select(CardModels.Ask.new("Remove inner wall?", ["The new zone is sealed. The old wall between is now inside.", "Take it down for +%d?" % refund], "inner_yes", "inner_no", inner))
++	if not _zones_ready or phase == "title" or phase == "over":
++		return
++	if breached:
++		hud.show_banner("ZONE BREACHED", "Workers will rebuild the wall" if walls.auto_rebuild else "Tap the rubble to rebuild it", Hud.DANGER)
++		_ui("zone_breached")
++		cam.shake(0.4)
++	elif secured:
++		hud.show_banner("ZONE SECURED", "Guns inside restock from crates in the zone", Hud.OK)
++
++func _on_tool_changed(t: String) -> void:
++	var h := ""
++	if t == "remove":
++		h = "Tap what to remove, then tick (refund)"
++	elif t == "_move":
++		h = "Drag it or tap a spot, turn the handle, then tick"
++	elif t == "_reshape":
++		h = "Drag corners, tap + for a new corner, then tick"
++	elif t == "_heli_rescue":
++		h = "Tap a group of survivors (SOS)"
++	elif t == "_heli_patrol":
++		h = "Tap where it should patrol"
++	elif Defs.BUILD.has(t):
++		h = String(Defs.BUILD[t].get("hint", ""))
++		if Defs.MOUNTABLE.has(t):
++			h = "Tap ground or a glowing slot, then tick"
++		elif t == "wall" or t == "concrete":
++			h = "Tap points. Drag to look. Tick to build"
++		elif t.begins_with("fort_"):
++			h = "Tap the start, tap the end, then tick. Tap a module for floors"
++		elif bool(Defs.BUILD[t].get("line", false)):
++			h = "Tap the start, tap the end, then tick"
++		elif not Defs.is_prefab(t):
++			h = "Tap to place, then tick"
++	hud.set_tool(t, h)
++
++func _on_play() -> void:
++	_ui("ui_confirm")
++	hud.show_title(false)
++	phase = "build"
++	phase_t = Defs.FIRST_BUILD_PHASE_TIME
++	cam.focus(Defs.hq_center() + Vector3(0, 0, 4), 38.0)
++	hud.show_banner("BUILD", "Wave 1 comes from the %s" % _edge_text())
++	hud.toast("Tap BUILD, pick Wood, tap points round the HQ, then tick")
++
++func _on_restart() -> void:
++	get_tree().reload_current_scene()
++
++func wave_size(w: int) -> int:
++	return maxi(1, int(round(_base_wave_size(w) * horde_mult)))
++
++func _base_wave_size(w: int) -> float:
++	var mult: float = float(G.map.layout.get("wave_mult", 1.0)) if G.map else 1.0
++	if w == 1:
++		return 24.0
++	if w == 2:
++		return 44.0
++	if w == 3:
++		return 60.0
++	return 60.0 * pow(1.38, w - 3) * mult
++
++func _load_game_settings() -> void:
++	if test_mode:
++		return
++	var cf := ConfigFile.new()
++	if cf.load(QualityManager.SETTINGS_PATH) == OK:
++		var sp := float(cf.get_value("game", "zombie_speed", 1.0))
++		var hm := float(cf.get_value("game", "horde", 1.0))
++		var sr := float(cf.get_value("game", "spawn_rate", 1.0))
++		zombie_speed = sp if SPEED_CHOICES.has(sp) else 1.0
++		horde_mult = hm if HORDE_CHOICES.has(hm) else 1.0
++		spawn_rate = sr if SPAWN_CHOICES.has(sr) else 1.0
++
++func _save_game_settings() -> void:
++	if test_mode:
++		return
++	var cf := ConfigFile.new()
++	cf.load(QualityManager.SETTINGS_PATH)
++	cf.set_value("game", "zombie_speed", zombie_speed)
++	cf.set_value("game", "horde", horde_mult)
++	cf.set_value("game", "spawn_rate", spawn_rate)
++	cf.save(QualityManager.SETTINGS_PATH)
++
++static func _step_choice(choices: Array, v: float, step: int) -> float:
++	var i := choices.find(v)
++	if i < 0:
++		i = choices.find(1.0)
++	return choices[clampi(i + step, 0, choices.size() - 1)]
++
++func game_setting(key: String) -> float:
++	match key:
++		"zspeed":
++			return zombie_speed
++		"horde":
++			return horde_mult
++		"spawn":
++			return spawn_rate
++	return 1.0
++
++func setting_choices(key: String) -> Array:
++	match key:
++		"zspeed":
++			return SPEED_CHOICES
++		"horde":
++			return HORDE_CHOICES
++	return SPAWN_CHOICES
++
++func _step_setting(key: String, step: int) -> void:
++	var v := _step_choice(setting_choices(key), game_setting(key), step)
++	match key:
++		"zspeed":
++			zombie_speed = v
++		"horde":
++			horde_mult = v
++		"spawn":
++			spawn_rate = v
++	_save_game_settings()
++	_ui("ui_tap")
++	var when := "new zombies from now on" if key == "zspeed" else "from the next wave"
++	hud.toast("%s %d%%  ·  %s" % [{"zspeed": "Zombie speed", "horde": "Horde size", "spawn": "Spawn rate"}[key], int(round(v * 100.0)), when])
++
++func _plan_edges() -> void:
++	var n := 1
++	if wave >= 2:
++		n = 2
++	if wave >= 6:
++		n = 3
++	if wave >= 9:
++		n = 4
++	var all := [0, 1, 2, 3]
++	all.shuffle()
++	if wave == 1:
++		all = [0]
++	_edges = all.slice(0, n)
++	_edges.sort()
++
++func _edge_text() -> String:
++	var names := []
++	for e in _edges:
++		names.append(EDGE_NAMES[e])
++	if names.size() == 1:
++		return names[0]
++	if names.size() == 4:
++		return "every side"
++	return ", ".join(names.slice(0, names.size() - 1)) + " and " + names[-1]
++
++func start_wave() -> void:
++	if phase != "build":
++		return
++	autosave()
++	phase = "wave"
++	zombies.wave = wave
++	_wave_t = 0.0
++	_stall_t = 0.0
++	_queue.clear()
++	var count := wave_size(wave)
++	var runner_frac := 0.0
++	if wave >= 3:
++		runner_frac = minf(0.45, 0.15 + 0.035 * (wave - 3))
++	var brutes := mini(count, int(round(brute_count(wave) * horde_mult)))
++	for i in count - brutes:
++		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)
++	_queue.shuffle()
++	for i in brutes:
++		var at := int(float(_queue.size()) * (0.15 + 0.6 * float(i) / maxf(1.0, brutes)))
++		_queue.insert(clampi(at, 0, _queue.size()), Defs.Z_BRUTE)
++	var duration := 22.0 + wave * 4.0
++	if wave == 1:
++		duration = 40.0
++	_spawn_gap = maxf(0.03, duration / count / spawn_rate)
++	_spawn_t = 0.5
++	var sub := "From the %s" % _edge_text()
++	if brutes > 0:
++		sub += "  ·  %d brute%s" % [brutes, "" if brutes == 1 else "s"]
++	hud.show_banner("WAVE %d" % wave, sub)
++	if G.sfx:
++		G.sfx.play("siren", Vector3.ZERO)
++	wave_started.emit(wave)
++
++func brute_count(w: int) -> int:
++	if w < 4:
++		return 0
++	return w - 3 + maxi(0, w - 7)
++
++func _spawn_step(dt: float) -> void:
++	_spawn_t -= dt
++	var cap: int = quality.horde_cap() if quality else Defs.MAX_ALIVE
++	while _spawn_t <= 0.0 and not _queue.is_empty():
++		if zombies.alive_count >= cap:
++			_spawn_t = 0.3
++			return
++		var pack := mini(_queue.size(), G.rng.randi_range(2, 4) if wave < 4 else G.rng.randi_range(3, 7))
++		var at := _spawn_point()
++		for k in pack:
++			if zombies.alive_count >= cap:
++				break
++			var kind: int = _queue.pop_back()
++			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
++			zombies.spawn(kind, at + off)
++		_spawn_t += _spawn_gap * pack * G.rng.randf_range(0.6, 1.4)
++
++func _spawn_point() -> Vector3:
++	var e: int = _edges[G.rng.randi() % _edges.size()]
++	if G.map:
++		return G.map.spawn_point(e, G.rng)
++	var h := Defs.HALF
++	var along := G.rng.randf_range(-h * 0.6, h * 0.6)
++	var out := G.rng.randf_range(2.0, 7.0)
++	match e:
++		0:
++			return Vector3(along, 0, -h - out)
++		1:
++			return Vector3(h + out, 0, along)
++		2:
++			return Vector3(along, 0, h + out)
++		_:
++			return Vector3(-h - out, 0, along)
++
++func wave_bonus() -> int:
++	var claimed := 0
++	if G.map:
++		for mb in G.map.buildings:
++			if is_instance_valid(mb) and mb.claimed:
++				claimed += 1
++	return Defs.WAVE_BONUS_BASE + Defs.WAVE_BONUS_PER * wave + Defs.BONUS_PER_PERSON * maxi(0, people.population() - Defs.BONUS_FREE_PEOPLE) + Defs.BONUS_PER_CLAIM * claimed
++
++func _wave_cleared() -> void:
++	waves_cleared = wave
++	var bonus := wave_bonus()
++	var farm := 0
++	for b in buildings.built_of("greenhouse"):
++		farm += int(b.def.get("income", 0))
++	var post := 0
++	for b in buildings.built_of("outpost"):
++		post += int(b.def.get("income", 0))
++		var site = buildings.site_near(b.position, float(b.def.get("site_range", 14.0)))
++		if site != null:
++			post += site.take(int(b.def.get("scrap_take", 40)))
++	add_supplies(bonus + farm + post)
++	var sub := "+%d supplies" % (bonus + farm + post)
++	if farm > 0:
++		sub += " (%d from farms)" % farm
++	if post > 0:
++		sub += " (%d from outposts)" % post
++	if people.saved_wave > 0:
++		sub += "  ·  %d saved" % people.saved_wave
++	if people.lost_wave > 0:
++		sub += "  ·  %d lost" % people.lost_wave
++	hud.show_banner("WAVE %d CLEARED" % wave, sub)
++	_ui("wave_cleared")
++	logi.on_wave_cleared()
++	wave_cleared.emit(wave)
++	wave += 1
++	phase = "build"
++	phase_t = Defs.BUILD_PHASE_TIME
++	_plan_edges()
++	if wave == 3 and buildings.count_built("workshop") == 0:
++		hud.toast("Guns use up ammo crates. Build a Workshop and add Crafters")
++	if wave == 2:
++		hud.toast("Outposts: build one by a scrap site for income. Zombies will go for it")
++	for t in Defs.TOOLS:
++		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
++			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
++	_save_t = 20.0
++	autosave()
++
++func autosave() -> void:
++	if test_mode or manual_clock or phase == "title" or phase == "over":
++		return
++	SaveGame.write(self)
++
++func _on_continue() -> void:
++	var d := SaveGame.read()
++	if d.is_empty():
++		hud.toast("That save can't be loaded")
++		_ui("ui_invalid")
++		return
++	_ui("ui_confirm")
++	G.resume = d
++	get_tree().reload_current_scene()
++
++func _continue(d: Dictionary) -> void:
++	hud.show_title(false)
++	if not SaveGame.restore(self, d):
++		hud.show_title(true)
++		return
++	phase = "build"
++	phase_t = maxf(float(d.get("phase_t", 0.0)), 30.0)
++	_save_t = 20.0
++	_plan_edges()
++	cam.focus(Defs.hq_center() + Vector3(0, 0, 4), 38.0)
++	cam.snap()
++	hud.show_banner("WELCOME BACK", "Wave %d comes from the %s" % [wave, _edge_text()])
++
++func on_hq_destroyed() -> void:
++	if phase == "over":
++		return
++	phase = "over"
++	SaveGame.clear()
++	builder.set_tool("")
++	builder.select(null)
++	_queue.clear()
++	hud.show_game_over(waves_cleared, zombies.kills)
++
++func _make_edge_markers() -> void:
++	var pm := PlaneMesh.new()
++	pm.size = Vector2(44.0, 7.0)
++	var h := Defs.HALF - 4.0
++	var spots := [
++		[Vector3(0, 0.05, -h), PI],
++		[Vector3(h, 0.05, 0), PI * 0.5],
++		[Vector3(0, 0.05, h), 0.0],
++		[Vector3(-h, 0.05, 0), -PI * 0.5],
++	]
++	for s in spots:
++		var mi := MeshInstance3D.new()
++		mi.mesh = pm
++		mi.material_override = Art.mat_spawn_arrow
++		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
++		mi.position = s[0]
++		mi.rotation.y = s[1]
++		mi.visible = false
++		add_child(mi)
++		_edge_markers.append(mi)
++
++func _update_markers() -> void:
++	var show := phase == "build" or (phase == "wave" and not _queue.is_empty())
++	for i in 4:
++		_edge_markers[i].visible = show and _edges.has(i)
++
++func _showcase(dir: String) -> void:
++	DirAccess.make_dir_recursive_absolute(dir)
++	hud.show_title(false)
++	phase = "build"
++	phase_t = 999.0
++	supplies = 20000
++	wave = 6
++	var c := Defs.hq_center()
++	cam.focus(c + Vector3(0, 0, 2), 36.0)
++	cam.snap()
++	hud.set_tab("build")
++	for i in 40:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	await _shot(dir + "/01_start.png")
++	builder.set_tool("wall")
++	var ring := []
++	for q in START_RING:
++		ring.append(c + q)
++	cam.focus(c, 40.0)
++	cam.snap()
++	for i in 3:
++		await get_tree().process_frame
++	for i in 5:
++		builder.tap(cam.cam.unproject_position(ring[i]))
++	for i in 6:
++		_update_hud()
++		await get_tree().process_frame
++	await _shot(dir + "/02_drawing.png")
++	builder.cancel()
++	builder.set_tool("")
++	var rp: Array[Vector3] = []
++	for q in ring:
++		rp.append(q)
++	walls.build_ring("wall", rp)
++	walls.build_gate_now(c + Vector3(0, 0, 12))
++	var zf := c.z - 19.0
++	var house: Building = buildings.place_rect("house", Vector3(c.x - 7.0, 0, zf), 0.0, true)
++	var bar: Building = buildings.place_rect("barracks", Vector3(c.x + 2.0, 0, zf), 0.0, true)
++	walls.lay("wall", c + Vector3(-9, 0, -11), Vector3(c.x - 9.0, 0, zf + 2.0), 0, true)
++	walls.lay("wall", Vector3(c.x - 5.0, 0, zf), Vector3(c.x - 1.0, 0, zf), 0, true)
++	walls.lay("wall", Vector3(c.x + 5.0, 0, zf + 2.0), Vector3(c.x + 9.0, 0, zf + 2.0), 0, true)
++	walls.lay("wall", Vector3(c.x + 9.0, 0, zf + 2.0), c + Vector3(9, 0, -11), 0, true)
++	walls.refresh_posts()
++	zones.compute_now()
++	buildings.refresh_zones()
++	var inner := walls.inner_path(WallSystem.vkey(c + Vector3(-9, 0, -11)), WallSystem.vkey(c + Vector3(9, 0, -11)), [])
++	walls.remove_inner(inner)
++	if house:
++		buildings.mount(house, 0, "turret", false, true)
++		buildings.mount(house, 1, "sniper", false, true)
++	if bar:
++		buildings.mount(bar, 0, "mortar", false, true)
++	var east: LinearStructure = walls.segment_at(c + Vector3(12, 0, 1), 1.0)
++	if east:
++		walls.add_bastion(east, c + Vector3(12, 0, 1))
++	var west: LinearStructure = walls.segment_at(c + Vector3(-12, 0, 2), 1.0)
++	if west:
++		walls.add_nest(west, c + Vector3(-12, 0, 2), "turret")
++	var south: LinearStructure = walls.segment_at(c + Vector3(6, 0, 12), 1.0)
++	if south:
++		walls.add_ports(south)
++	var plat_c := Defs.world_to_cell(c + Vector3(-6, 0, 18))
++	if buildings.place("platform", plat_c):
++		buildings.mount(buildings.last_placed, 0, "turret")
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(-3, -2))
++	buildings.place_built("turret", Defs.HQ_ORIGIN + Vector2i(4, -2))
++	for i in 10:
++		people.spawn_civilian(c + Vector3(-2 + i * 0.5, 0, 6), true)
++	for i in 4:
++		people.add_job("worker")
++	for i in 3:
++		people.add_job("loader")
++	for i in 2:
++		people.add_job("soldier")
++	people.add_job("fetcher")
++	var fp := buildings.place_rect("depot", Vector3(c.x + 22.0, 0, c.z + 4.0), deg_to_rad(30.0), true)
++	for i in 3000:
++		sim_step(1.0 / 30.0)
++		if i % 200 == 0:
++			await get_tree().process_frame
++	zones.compute_now()
++	buildings.refresh_zones()
++	if south:
++		pass
++	for s2 in walls.live():
++		if s2.ported and s2.free_slots() > 0:
++			soldiers.assign(s2)
++	for i in 300:
++		sim_step(1.0 / 30.0)
++		if i % 60 == 0:
++			await get_tree().process_frame
++	cam.focus(c + Vector3(0, 0, -4), 50.0)
++	cam.snap()
++	for i in 10:
++		await get_tree().process_frame
++	await _shot(dir + "/03_base.png")
++	var wseg: LinearStructure = walls.segment_at(c + Vector3(-12, 0, -3), 1.0)
++	cam.focus(c + Vector3(-8, 0, 0), 32.0)
++	cam.snap()
++	builder.sel_point = c + Vector3(-12, 0, -3)
++	builder.select(wseg)
++	for i in 6:
++		await get_tree().process_frame
++	await _shot(dir + "/04_wall_card.png")
++	builder.select(null)
++	builder.select(buildings.hq)
++	for i in 6:
++		await get_tree().process_frame
++	await _shot(dir + "/05_people.png")
++	builder.select(null)
++	builder.set_tool("workshop")
++	cam.focus(c + Vector3(24, 0, -14), 34.0)
++	cam.snap()
++	for i in 3:
++		await get_tree().process_frame
++	builder.tap(cam.cam.unproject_position(c + Vector3(24, 0, -14)))
++	builder.g_yaw = deg_to_rad(30.0)
++	builder._refresh_ghost()
++	for i in 6:
++		_update_hud()
++		await get_tree().process_frame
++	await _shot(dir + "/06_place_building.png")
++	builder.set_tool("")
++	builder.set_tool("turret")
++	cam.focus(c + Vector3(0, 0, -18), 40.0)
++	cam.snap()
++	for i in 3:
++		await get_tree().process_frame
++	if bar:
++		builder.tap(cam.cam.unproject_position(bar.slot_xform(1).origin))
++	for i in 6:
++		_update_hud()
++		await get_tree().process_frame
++	await _shot(dir + "/07_roof_gun.png")
++	builder.set_tool("")
++	_edges = [0, 1]
++	start_wave()
++	for i in 2100:
++		sim_step(1.0 / 30.0)
++		if i % 90 == 0 or i > 1900:
++			await get_tree().process_frame
++	cam.focus(c + Vector3(4, 0, -8), 48.0)
++	cam.snap()
++	for i in 6:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	await _shot(dir + "/08_wave.png")
++	cam.focus(c + Vector3(10, 0, 4), 16.0)
++	cam.snap()
++	for i in 6:
++		sim_step(1.0 / 30.0)
++		await get_tree().process_frame
++	await _shot(dir + "/09_close.png")
++	builder.select(CardModels.Settings.new())
++	for i in 4:
++		await get_tree().process_frame
++	await _shot(dir + "/10_sound.png")
++	get_tree().quit()
++
++func _shot(path: String) -> void:
++	if hud and (path.contains("v06") or path.contains("suburb_v05")):
++		hud._banners.clear()
++		hud._banner_age = -1.0
++		hud.banner.visible = false
++	if hud:
++		hud._gain_t = 0.0
++		hud._gain = 0
++		hud.stats.queue_redraw()
++		await get_tree().process_frame
++	await RenderingServer.frame_post_draw
++	var img := get_viewport().get_texture().get_image()
++	img.save_png(path)
++	print("saved ", path)
+diff -ruN src_orig/scripts/maps/city_art.gd src/scripts/maps/city_art.gd
+--- a/scripts/maps/city_art.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/maps/city_art.gd	2026-10-25 08:08:36.618548509 +0000
+@@ -0,0 +1,329 @@
++class_name CityArt
++extends RefCounted
++# Procedural city blocks. Every tower is a few boxes merged into a handful of
++# chunk meshes (one draw call each); windows, shopfronts and grime come from
++# one shader that reads metric UVs, so no textures and very few vertices.
++# Facade vertices: COLOR.rgb = wall colour, COLOR.a = 1 (windowed),
++# UV = (metres along the facade, height), UV2 = (facade length, code) where
++# code = style + 4 * seed + 1024 * burnt. Roof bits have COLOR.a = 0.
++const ROOFS := [Color(0.55, 0.55, 0.53), Color(0.47, 0.48, 0.49), Color(0.6, 0.57, 0.51), Color(0.42, 0.42, 0.43), Color(0.52, 0.47, 0.42)]
++const CONCRETE := Color(0.62, 0.61, 0.58)
++const METAL := Color(0.5, 0.52, 0.53)
++const TANK := Color(0.56, 0.43, 0.3)
++static var _mat: ShaderMaterial
++static var _heap: ArrayMesh
++
++const SHADER := """
++shader_type spatial;
++render_mode cull_back, diffuse_burley;
++uniform sampler2D grime_tex : filter_linear_mipmap, repeat_enable;
++uniform float ground_h = 4.2;
++uniform float floor_h = 3.2;
++uniform float fill = 0.22;
++varying vec3 wp;
++varying vec3 wn;
++void vertex() {
++	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
++	wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
++}
++float hash2(vec2 p) {
++	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
++	p3 += dot(p3, p3.yzx + 33.33);
++	return fract((p3.x + p3.y) * p3.z);
++}
++float band(float x, float a, float b, float w) {
++	return smoothstep(a - w, a + w, x) * (1.0 - smoothstep(b - w, b + w, x));
++}
++vec3 to_linear(vec3 c) {
++	return mix(pow((c + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), c * (1.0 / 12.92), lessThan(c, vec3(0.04045)));
++}
++void fragment() {
++	vec3 col = COLOR.rgb;
++	vec3 an = abs(wn);
++	vec2 tuv = an.y > 0.5 ? wp.xz : (an.x > 0.5 ? wp.zy : wp.xy);
++	float g = texture(grime_tex, tuv * 0.18).r;
++	float rough = 0.9;
++	float spec = 0.25;
++	vec3 emit = vec3(0.0);
++	vec3 sheen = vec3(0.0);
++	if (COLOR.a > 0.5) {
++		float code = UV2.y + 0.5;
++		float burnt = floor(code / 1024.0);
++		float rem = code - burnt * 1024.0;
++		float sd = floor(rem / 4.0);
++		float sty = floor(rem - sd * 4.0);
++		float L = max(UV2.x, 1.0);
++		float u = UV.x;
++		float v = UV.y;
++		float streak = texture(grime_tex, vec2(u * 0.3 + sd * 0.17, v * 0.035)).r;
++		col *= (0.78 + 0.3 * streak) * (0.9 + 0.1 * g);
++		col *= mix(0.7, 1.0, smoothstep(0.0, 3.0, v));
++		float m = 0.0;
++		float h = 0.5;
++		if (v < ground_h) {
++			float sc = max(1.0, floor(L / 4.6 + 0.5));
++			float su = u / (L / sc);
++			float sfu = fract(su);
++			float sh = hash2(vec2(floor(su) + sd * 3.1, sd + 7.0));
++			m = band(sfu, 0.08, 0.92, fwidth(su)) * band(v, 0.35, ground_h - 0.95, fwidth(v));
++			if (sty > 0.5 && sh < 0.45) {
++				vec3 shutter = vec3(0.46, 0.47, 0.46) * (0.82 + 0.18 * step(0.5, fract(v * 5.0)));
++				col = mix(col, shutter, m);
++				m = 0.0;
++			}
++			h = sh;
++			col = mix(col, col * 0.55, band(v, ground_h - 0.85, ground_h - 0.3, fwidth(v)));
++		} else {
++			float pitch = sty < 0.5 ? 1.7 : (sty < 1.5 ? 3.0 : (sty < 2.5 ? 2.7 : 2.3));
++			float nc = max(1.0, floor(L / pitch + 0.5));
++			float cu = u / (L / nc);
++			float ci = floor(cu);
++			float fu = fract(cu);
++			float fv = (v - ground_h) / floor_h;
++			float fl = floor(fv);
++			float ff = fract(fv);
++			float wu = fwidth(cu);
++			float wv = fwidth(fv);
++			float avg = 0.3;
++			if (sty < 0.5) {
++				m = band(fu, 0.07, 0.93, wu) * band(ff, 0.24, 0.95, wv);
++				avg = 0.62;
++			} else if (sty < 1.5) {
++				m = band(fu, 0.3, 0.7, wu) * band(ff, 0.28, 0.82, wv);
++				col = mix(col, col * 0.82, band(ff, 0.0, 0.07, wv));
++				avg = 0.22;
++			} else if (sty < 2.5) {
++				m = band(fu, 0.17, 0.83, wu) * band(ff, 0.32, 0.8, wv);
++				col = mix(col, col * 0.84, band(ff, 0.0, 0.1, wv));
++				avg = 0.32;
++			} else {
++				m = band(fu, 0.33, 0.67, wu) * band(ff, 0.2, 0.84, wv);
++				col = mix(col, col * 1.1, band(ff, 0.0, 0.07, wv));
++				avg = 0.22;
++			}
++			m = mix(m, avg, smoothstep(0.25, 0.6, max(wu, wv)));
++			h = hash2(vec2(ci + sd * 13.0, fl + sd * 7.0));
++		}
++		vec3 sky = mix(vec3(0.26, 0.31, 0.37), vec3(0.5, 0.56, 0.62), fract(v * 0.06 + sd * 0.37));
++		vec3 glass = mix(vec3(0.16, 0.18, 0.2), sky, sty < 0.5 ? 0.75 : 0.5);
++		if (burnt > 0.5 || h < 0.07) {
++			glass = vec3(0.025, 0.022, 0.02);
++		} else if (h > 0.95) {
++			glass = vec3(0.95, 0.66, 0.32);
++			emit = vec3(0.5, 0.28, 0.08) * m;
++		} else if (h > 0.87) {
++			glass = vec3(0.36, 0.28, 0.19);
++		}
++		col = mix(col, glass, m);
++		sheen = sky * m * (1.0 - burnt) * step(h, 0.87) * step(0.07, h);
++		rough = mix(0.9, 0.3, m);
++		spec = mix(0.25, 0.55, m);
++		if (burnt > 0.5) {
++			col *= mix(0.62, 0.85, smoothstep(0.0, 9.0, v) * streak);
++		}
++	} else if (wn.y > 0.5) {
++		// weathered roofing felt / gravel
++		float blot = texture(grime_tex, wp.xz * 0.045 + vec2(0.3, 0.7)).r;
++		col *= (0.75 + 0.3 * blot) * (0.88 + 0.12 * g);
++	} else {
++		col *= g;
++	}
++	ALBEDO = to_linear(col);
++	ROUGHNESS = rough;
++	SPECULAR = spec;
++	// Fill light so walls in the shade of other blocks stay readable, and a
++	// fake sky reflection on the glass.
++	EMISSION = to_linear(emit) + ALBEDO * fill + to_linear(sheen) * 0.22;
++}
++"""
++
++static func material() -> ShaderMaterial:
++	if _mat:
++		return _mat
++	var sh := Shader.new()
++	sh.code = SHADER
++	_mat = ShaderMaterial.new()
++	_mat.shader = sh
++	_mat.set_shader_parameter("grime_tex", Art.grime_tex)
++	_mat.set_shader_parameter("ground_h", CityLayout.GROUND_H)
++	_mat.set_shader_parameter("floor_h", CityLayout.FLOOR_H)
++	return _mat
++
++# Rubble heap for the streets and the collapsed lot (Art.mat_vc).
++static func heap_mesh() -> ArrayMesh:
++	if _heap:
++		return _heap
++	var k := MeshKit.new()
++	var r := RandomNumberGenerator.new()
++	r.seed = 5150
++	var conc := Color(0.6, 0.58, 0.54)
++	k.sphere(1.9, Vector3(0, -0.2, 0), conc.darkened(0.25), Vector3(1.1, 0.55, 0.9), Vector3.ZERO, 8, 4)
++	for i in 14:
++		var a := r.randf() * TAU
++		var d := r.randf_range(0.2, 1.8)
++		var p := Vector3(cos(a) * d, r.randf_range(0.1, 0.8) * (1.6 - d * 0.6), sin(a) * d * 0.8)
++		var c := conc.lerp(Color(0.55, 0.36, 0.28), r.randf() * 0.6).darkened(r.randf() * 0.2)
++		k.box(Vector3(r.randf_range(0.5, 1.3), r.randf_range(0.2, 0.45), r.randf_range(0.4, 1.0)), p, c, Vector3(r.randf_range(-0.4, 0.4), r.randf() * TAU, r.randf_range(-0.4, 0.4)))
++	for i in 4:
++		var a2 := r.randf() * TAU
++		k.cyl(0.03, 0.03, 1.6, Vector3(cos(a2) * 0.8, 0.9, sin(a2) * 0.6), Color(0.35, 0.22, 0.15), Vector3(r.randf_range(-0.9, 0.9), 0, r.randf_range(-0.9, 0.9)), 4)
++	_heap = k.build()
++	return _heap
++
++# Collects towers into one mesh (a chunk of the city).
++class Batch:
++	var v := PackedVector3Array()
++	var n := PackedVector3Array()
++	var c := PackedColorArray()
++	var uv := PackedVector2Array()
++	var uv2 := PackedVector2Array()
++	var idx := PackedInt32Array()
++
++	func quad(a: Vector3, b: Vector3, cc: Vector3, d: Vector3, nrm: Vector3, col: Color, ua: Vector2, ub: Vector2, uc: Vector2, ud: Vector2, u2: Vector2) -> void:
++		var base := v.size()
++		v.append_array([a, b, cc, d])
++		uv.append_array([ua, ub, uc, ud])
++		for i in 4:
++			n.append(nrm)
++			c.append(col)
++			uv2.append(u2)
++		if (b - a).cross(cc - a).dot(nrm) > 0.0:
++			idx.append_array([base, base + 2, base + 1, base, base + 3, base + 2])
++		else:
++			idx.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
++
++	# Axis-aligned block with metric facade UVs. windows=false makes a plain
++	# (roof-type) box. top=null leaves the lid off.
++	func block(x0: float, z0: float, x1: float, z1: float, y0: float, y1: float, wall: Color, code: float, windows: bool, top = null) -> void:
++		var a := 1.0 if windows else 0.0
++		var col := Color(wall.r, wall.g, wall.b, a)
++		var lx := x1 - x0
++		var lz := z1 - z0
++		quad(Vector3(x0, y0, z1), Vector3(x1, y0, z1), Vector3(x1, y1, z1), Vector3(x0, y1, z1), Vector3(0, 0, 1), col,
++			Vector2(0, y0), Vector2(lx, y0), Vector2(lx, y1), Vector2(0, y1), Vector2(lx, code))
++		quad(Vector3(x1, y0, z0), Vector3(x0, y0, z0), Vector3(x0, y1, z0), Vector3(x1, y1, z0), Vector3(0, 0, -1), col,
++			Vector2(0, y0), Vector2(lx, y0), Vector2(lx, y1), Vector2(0, y1), Vector2(lx, code))
++		quad(Vector3(x1, y0, z1), Vector3(x1, y0, z0), Vector3(x1, y1, z0), Vector3(x1, y1, z1), Vector3(1, 0, 0), col,
++			Vector2(0, y0), Vector2(lz, y0), Vector2(lz, y1), Vector2(0, y1), Vector2(lz, code))
++		quad(Vector3(x0, y0, z0), Vector3(x0, y0, z1), Vector3(x0, y1, z1), Vector3(x0, y1, z0), Vector3(-1, 0, 0), col,
++			Vector2(0, y0), Vector2(lz, y0), Vector2(lz, y1), Vector2(0, y1), Vector2(lz, code))
++		if top != null:
++			var tc: Color = top
++			quad(Vector3(x0, y1, z0), Vector3(x1, y1, z0), Vector3(x1, y1, z1), Vector3(x0, y1, z1), Vector3.UP, Color(tc.r, tc.g, tc.b, 0.0),
++				Vector2(x0, z0), Vector2(x1, z0), Vector2(x1, z1), Vector2(x0, z1), Vector2.ZERO)
++
++	# Low wall round a roof edge: outer, inner and top faces only.
++	func parapet(x0: float, z0: float, x1: float, z1: float, y0: float, h: float, t: float, col: Color) -> void:
++		var cc := Color(col.r, col.g, col.b, 0.0)
++		var y1 := y0 + h
++		block(x0, z0, x1, z1, y0, y1, col, 0.0, false)
++		var ix0 := x0 + t
++		var iz0 := z0 + t
++		var ix1 := x1 - t
++		var iz1 := z1 - t
++		var z := Vector2.ZERO
++		quad(Vector3(ix1, y0, iz1), Vector3(ix0, y0, iz1), Vector3(ix0, y1, iz1), Vector3(ix1, y1, iz1), Vector3(0, 0, -1), cc, z, z, z, z, z)
++		quad(Vector3(ix0, y0, iz0), Vector3(ix1, y0, iz0), Vector3(ix1, y1, iz0), Vector3(ix0, y1, iz0), Vector3(0, 0, 1), cc, z, z, z, z, z)
++		quad(Vector3(ix1, y0, iz0), Vector3(ix1, y0, iz1), Vector3(ix1, y1, iz1), Vector3(ix1, y1, iz0), Vector3(-1, 0, 0), cc, z, z, z, z, z)
++		quad(Vector3(ix0, y0, iz1), Vector3(ix0, y0, iz0), Vector3(ix0, y1, iz0), Vector3(ix0, y1, iz1), Vector3(1, 0, 0), cc, z, z, z, z, z)
++		var top := cc.lightened(0.08)
++		quad(Vector3(x0, y1, z0), Vector3(x1, y1, z0), Vector3(x1, y1, iz0), Vector3(x0, y1, iz0), Vector3.UP, top, z, z, z, z, z)
++		quad(Vector3(x0, y1, iz1), Vector3(x1, y1, iz1), Vector3(x1, y1, z1), Vector3(x0, y1, z1), Vector3.UP, top, z, z, z, z, z)
++		quad(Vector3(x0, y1, iz0), Vector3(ix0, y1, iz0), Vector3(ix0, y1, iz1), Vector3(x0, y1, iz1), Vector3.UP, top, z, z, z, z, z)
++		quad(Vector3(ix1, y1, iz0), Vector3(x1, y1, iz0), Vector3(x1, y1, iz1), Vector3(ix1, y1, iz1), Vector3.UP, top, z, z, z, z, z)
++
++	func kit(k: MeshKit) -> void:
++		var base := v.size()
++		v.append_array(k.verts)
++		n.append_array(k.norms)
++		uv.append_array(k.uvs)
++		for col in k.cols:
++			c.append(Color(col.r, col.g, col.b, 0.0))
++			uv2.append(Vector2.ZERO)
++		for i in k.inds:
++			idx.append(base + i)
++
++	func is_empty() -> bool:
++		return v.is_empty()
++
++	func commit() -> ArrayMesh:
++		var arrays := []
++		arrays.resize(Mesh.ARRAY_MAX)
++		arrays[Mesh.ARRAY_VERTEX] = v
++		arrays[Mesh.ARRAY_NORMAL] = n
++		arrays[Mesh.ARRAY_COLOR] = c
++		arrays[Mesh.ARRAY_TEX_UV] = uv
++		arrays[Mesh.ARRAY_TEX_UV2] = uv2
++		arrays[Mesh.ARRAY_INDEX] = idx
++		var am := ArrayMesh.new()
++		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
++		return am
++
++static func tower_height(floors: int) -> float:
++	return CityLayout.GROUND_H + (floors - 1) * CityLayout.FLOOR_H
++
++# One tower: body, maybe a set-back top, parapet and roof clutter.
++static func add_tower(b: Batch, t: Dictionary) -> void:
++	var r: Rect2 = t["r"]
++	var floors := int(t["floors"])
++	var style := int(t["style"])
++	var sd := int(t["seed"])
++	var burnt := bool(t["burnt"])
++	var out := bool(t["out"])
++	var wall: Color = t["col"]
++	if burnt:
++		wall = wall.darkened(0.15)
++	var rng := RandomNumberGenerator.new()
++	rng.seed = sd * 7919 + floors * 31 + int(r.position.x * 13.0) + int(r.position.y * 7.0)
++	var code := float(style + 4 * sd + (1024 if burnt else 0))
++	var x0 := r.position.x
++	var z0 := r.position.y
++	var x1 := r.end.x
++	var z1 := r.end.y
++	var h := tower_height(floors)
++	var roof: Color = ROOFS[(sd + style) % ROOFS.size()]
++	if burnt:
++		roof = roof.darkened(0.3)
++	var trim := wall.darkened(0.28) if style != 3 else wall.lightened(0.12)
++	var inset := 2.0
++	var tier := floors >= 7 and minf(r.size.x, r.size.y) >= 12.0 and rng.randf() < 0.55
++	if tier:
++		var lower := floors - rng.randi_range(2, 3)
++		var h1 := tower_height(lower)
++		b.block(x0, z0, x1, z1, 0.0, h1, wall, code, true, roof)
++		b.block(x0 - 0.25, z0 - 0.25, x1 + 0.25, z1 + 0.25, h1, h1 + 0.45, trim, 0.0, false, trim)
++		x0 += inset
++		z0 += inset
++		x1 -= inset
++		z1 -= inset
++		b.block(x0, z0, x1, z1, h1 + 0.45, h, wall, code, true, roof)
++	else:
++		b.block(x0, z0, x1, z1, 0.0, h, wall, code, true, roof)
++	var over := 0.35 if style == 3 else 0.15
++	b.parapet(x0 - over, z0 - over, x1 + over, z1 + over, h, 0.75 if style != 0 else 0.5, 0.35, trim)
++	if out and floors < 9:
++		return
++	# Roof clutter: lift housing, AC units, the odd water tank or mast.
++	var k := MeshKit.new()
++	var w := x1 - x0
++	var dd := z1 - z0
++	var cx := (x0 + x1) * 0.5
++	var cz := (z0 + z1) * 0.5
++	var sx := rng.randf_range(-0.25, 0.25) * w
++	var sz := rng.randf_range(-0.25, 0.25) * dd
++	k.box(Vector3(minf(3.0, w * 0.3), 2.4, minf(2.6, dd * 0.3)), Vector3(cx + sx, h + 1.2, cz + sz), CONCRETE.darkened(rng.randf() * 0.2), Vector3.ZERO, 0.0)
++	if not out:
++		for i in rng.randi_range(1, 3):
++			var p := Vector3(cx + rng.randf_range(-0.35, 0.35) * w, h + 0.5, cz + rng.randf_range(-0.35, 0.35) * dd)
++			k.box(Vector3(1.5, 1.0, 1.1), p, METAL.lightened(rng.randf() * 0.2), Vector3(0, PI * 0.5 * rng.randi_range(0, 1), 0), 0.0)
++		if w > 9.0 and dd > 9.0:
++			var sp := Vector3(cx - sx * 0.6, h + 0.2, cz + sz * 0.3 - dd * 0.15)
++			k.box(Vector3(2.6, 0.45, 1.6), sp, Color(0.3, 0.36, 0.42), Vector3.ZERO, 0.0)
++	if style != 0 and floors >= 5 and rng.randf() < 0.45:
++		var tp := Vector3(cx - sx * 0.8, h, cz - sz * 0.8)
++		k.box(Vector3(2.4, 1.3, 2.4), tp + Vector3(0, 0.65, 0), Color(0.24, 0.23, 0.22), Vector3.ZERO, 0.0)
++		k.cyl(1.15, 1.15, 2.3, tp + Vector3(0, 2.45, 0), TANK.darkened(rng.randf() * 0.15), Vector3.ZERO, 8, 0.0)
++		k.cyl(0.0, 1.3, 0.8, tp + Vector3(0, 4.0, 0), TANK.darkened(0.3), Vector3.ZERO, 8, 0.0)
++	elif style == 0 and floors >= 8:
++		k.cyl(0.08, 0.14, 7.0, Vector3(cx + sx, h + 2.6 + 3.5, cz + sz), METAL, Vector3.ZERO, 4, 0.0)
++	b.kit(k)
+diff -ruN src_orig/scripts/maps/city_builder.gd src/scripts/maps/city_builder.gd
+--- a/scripts/maps/city_builder.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/maps/city_builder.gd	2026-10-25 08:08:36.618609561 +0000
+@@ -0,0 +1,323 @@
++class_name CityBuilder
++extends MapBuilder
++# Builds the City from CityLayout data. MapBuilder does the shops, props, plaza
++# trees and salvage wrecks; this adds the streets (several widths), the tall
++# blocks and rubble. Towers are permanent rock on the nav grid: zombies and
++# people go round them, nothing can be built on them, they can't be cleared,
++# and (unlike houses) they close off a safe zone, so walling the street
++# mouths round the plaza makes it safe.
++const CHUNK := 120.0
++var spots: Array[Vector3] = []
++var sealed := 0
++var _extra := {}
++
++func build(d: Dictionary, seed_: int) -> void:
++	layout = d
++	rng.seed = seed_
++	_city_surfaces()
++	_towers()
++	_rubble()
++	_buildings()
++	_props()
++	_trees()
++	_dead_cars()
++	_wrecks()
++	_seal_pockets()
++	_entries()
++	_flush_multimeshes()
++	_flush_extra()
++	_hide_outer_decor()
++	spots.assign(layout["spots"])
++	# A higher sun than the fields: long evening shadows would bury the
++	# streets between the blocks.
++	if G.main and G.main.get("sun") != null:
++		G.main.sun.rotation_degrees.x = -50.0
++	for m in Art.grid_materials():
++		m.set_shader_parameter("zone_tex", G.zones.mask_tex)
++	G.grid.notify_paths_changed()
++
++# --- ground -----------------------------------------------------------------
++
++func _city_surfaces() -> void:
++	var by_w := {}
++	var plain := SurfaceBuilder.new()
++	var pave := SurfaceBuilder.new()
++	var kerb := SurfaceBuilder.new()
++	var grounds := {}
++	var pw := CityLayout.PAVE_W
++	var roads: Array = layout["roads"]
++	for r in roads:
++		var a: Vector3 = r["a"]
++		var b: Vector3 = r["b"]
++		var w := float(r["w"])
++		var along := (b - a).normalized()
++		var across := Vector3(-along.z, 0, along.x)
++		var l := a.distance_to(b)
++		var x_road := absf(along.x) > 0.5
++		if not by_w.has(w):
++			by_w[w] = SurfaceBuilder.new()
++		(by_w[w] as SurfaceBuilder).strip(a, b, w, ROAD_Y, 0.0, l, w)
++		_mark_paved(a, b, w + pw * 2.0)
++		var cuts_k: Array = []
++		var cuts_p: Array = []
++		for o in roads:
++			if o == r:
++				continue
++			var oa: Vector3 = o["a"]
++			var ob: Vector3 = o["b"]
++			var od := (ob - oa).normalized()
++			if absf(od.dot(along)) > 0.5:
++				continue
++			var e0 := (oa - a).dot(across)
++			var e1 := (ob - a).dot(across)
++			if minf(e0, e1) > w * 0.5 + 0.1 or maxf(e0, e1) < -w * 0.5 - 0.1:
++				continue
++			var t := (oa - a).dot(along)
++			if t < -1.0 or t > l + 1.0:
++				continue
++			var ow := float(o["w"]) * 0.5
++			cuts_k.append(Vector2(t - ow, t + ow))
++			# x-roads keep their pavement through the corners; z-roads stop short.
++			cuts_p.append(Vector2(t - ow, t + ow) if x_road else Vector2(t - ow - pw, t + ow + pw))
++			if x_road:
++				var c := a + along * t
++				plain.strip(c - Vector3(ow, 0, 0), c + Vector3(ow, 0, 0), w, ROAD_Y + 0.004, 0.0, ow * 2.0, 8.0)
++		for side in [-1.0, 1.0]:
++			for sp in _spans(cuts_p, l):
++				var off: Vector3 = across * side * (w * 0.5 + pw * 0.5)
++				pave.strip(a + along * sp.x + off, a + along * sp.y + off, pw, PAVE_Y, sp.x, sp.y, 4.0)
++			for sp in _spans(cuts_k, l):
++				var ko: Vector3 = across * side * (w * 0.5)
++				kerb.kerb(a + along * sp.x + ko, a + along * sp.y + ko, across * side, ROAD_Y, PAVE_Y, 0.25)
++		# Streets that stop at the plaza get a kerb across the end.
++		for end in [[a, -along], [b, along]]:
++			var e: Vector3 = end[0]
++			if absf(e.x) < CityLayout.EXT - 1.0 and absf(e.z) < CityLayout.EXT - 1.0:
++				kerb.kerb(e - across * w * 0.5, e + across * w * 0.5, end[1], ROAD_Y, PAVE_Y, 0.25)
++	for g in layout["grounds"]:
++		var kind := String(g["kind"])
++		if not grounds.has(kind):
++			grounds[kind] = SurfaceBuilder.new()
++		_rect(grounds[kind], g["r"], PAVE_Y - (0.002 if kind == "pavement" else 0.0))
++		_pave_rect(g["r"])
++	var lawn: Rect2 = layout["lawn"]
++	var corners := [Vector3(lawn.position.x, 0, lawn.position.y), Vector3(lawn.end.x, 0, lawn.position.y),
++		Vector3(lawn.end.x, 0, lawn.end.y), Vector3(lawn.position.x, 0, lawn.end.y)]
++	var mid := Vector3(lawn.get_center().x, 0, lawn.get_center().y)
++	for i in 4:
++		var k0: Vector3 = corners[i]
++		var k1: Vector3 = corners[(i + 1) % 4]
++		var outward := (((k0 + k1) * 0.5) - mid)
++		outward = Vector3(signf(outward.x) if absf(outward.x) > absf(outward.z) else 0.0, 0, signf(outward.z) if absf(outward.z) >= absf(outward.x) else 0.0)
++		kerb.kerb(k0, k1, outward, 0.0, PAVE_Y, 0.2)
++	for w in by_w:
++		_add_mesh("Roads_%d" % int(w), (by_w[w] as SurfaceBuilder).commit(), Art.surface_mat("asphalt_road", float(w)))
++	_add_mesh("Junctions", plain.commit(), Art.surface_mat("asphalt", 8.0))
++	_add_mesh("Pavements", pave.commit(), Art.surface_mat("pavement", 4.0))
++	_add_mesh("Kerbs", kerb.commit(), Art.surface_mat("kerb", 1.0))
++	for kind in grounds:
++		_add_mesh("Ground_" + kind, (grounds[kind] as SurfaceBuilder).commit(), Art.surface_mat(kind, 4.0 if kind != "asphalt" else 8.0))
++
++func _spans(cuts: Array, l: float) -> Array:
++	cuts.sort_custom(func(x, y): return x.x < y.x)
++	var out: Array = []
++	var from := 0.0
++	for c in cuts:
++		if c.x > from:
++			out.append(Vector2(from, minf(c.x, l)))
++		from = maxf(from, c.y)
++	if from < l:
++		out.append(Vector2(from, l))
++	return out
++
++func _rect(sb: SurfaceBuilder, r: Rect2, y: float) -> void:
++	var A := Vector3(r.position.x, y, r.position.y)
++	var B := Vector3(r.end.x, y, r.position.y)
++	var C := Vector3(r.end.x, y, r.end.y)
++	var D := Vector3(r.position.x, y, r.end.y)
++	sb._quad(A, B, C, D, Vector2(A.x, A.z), Vector2(B.x, B.z), Vector2(C.x, C.z), Vector2(D.x, D.z), Vector3.UP)
++
++func _pave_rect(r: Rect2) -> void:
++	var c0 := Defs.world_to_cell(Vector3(r.position.x + 0.01, 0, r.position.y + 0.01))
++	var c1 := Defs.world_to_cell(Vector3(r.end.x - 0.01, 0, r.end.y - 0.01))
++	for y in range(maxi(0, c0.y), mini(Defs.H - 1, c1.y) + 1):
++		for x in range(maxi(0, c0.x), mini(Defs.W - 1, c1.x) + 1):
++			paved[G.grid.idx(Vector2i(x, y))] = true
++
++# --- towers -----------------------------------------------------------------
++
++func _towers() -> void:
++	var batches := {}
++	for t in layout["towers"]:
++		var r: Rect2 = t["r"]
++		var c := r.get_center()
++		var key := Vector2i(floori(c.x / CHUNK + 0.5), floori(c.y / CHUNK + 0.5))
++		if not batches.has(key):
++			batches[key] = CityArt.Batch.new()
++		CityArt.add_tower(batches[key], t)
++		if not bool(t["out"]):
++			_rock_rect(r)
++	for key in batches:
++		var mi := MeshInstance3D.new()
++		mi.name = "Towers_%d_%d" % [key.x, key.y]
++		mi.mesh = (batches[key] as CityArt.Batch).commit()
++		mi.material_override = CityArt.material()
++		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
++		add_child(mi)
++
++# Permanent blocker: rock on the nav grid, "Blocked" for building.
++func _rock_rect(r: Rect2) -> void:
++	var g: Grid = G.grid
++	var n0 := Defs.world_to_nav(Vector3(r.position.x + 0.05, 0, r.position.y + 0.05))
++	var n1 := Defs.world_to_nav(Vector3(r.end.x - 0.05, 0, r.end.y - 0.05))
++	for y in range(maxi(0, n0.y), mini(Defs.NH - 1, n1.y) + 1):
++		for x in range(maxi(0, n0.x), mini(Defs.NW - 1, n1.x) + 1):
++			var n := Vector2i(x, y)
++			var i := g.nidx(n)
++			g.nblk[i] = Grid.N_ROCK
++			g.nown[i] = self
++			g.terrain[g.idx(Defs.nav_to_build(n))] = Defs.T_ROCK
++
++# Open cells that nothing can reach from the map edge (a yard shut in by
++# towers) would read as a safe zone: fill them in.
++func _seal_pockets() -> void:
++	var g: Grid = G.grid
++	var nw := Defs.NW
++	var nh := Defs.NH
++	var total := nw * nh
++	var seen := PackedByteArray()
++	seen.resize(total)
++	var q := PackedInt32Array()
++	q.resize(total)
++	var qt := 0
++	for x in nw:
++		for y in [0, nh - 1]:
++			var i: int = y * nw + x
++			if seen[i] == 0 and g.nblk[i] != Grid.N_ROCK:
++				seen[i] = 1
++				q[qt] = i
++				qt += 1
++	for y in nh:
++		for x in [0, nw - 1]:
++			var i2: int = y * nw + x
++			if seen[i2] == 0 and g.nblk[i2] != Grid.N_ROCK:
++				seen[i2] = 1
++				q[qt] = i2
++				qt += 1
++	var qh := 0
++	while qh < qt:
++		var u := q[qh]
++		qh += 1
++		var ux := u % nw
++		var uy := u / nw
++		for v in [u - 1 if ux > 0 else -1, u + 1 if ux < nw - 1 else -1, u - nw if uy > 0 else -1, u + nw if uy < nh - 1 else -1]:
++			if v >= 0 and seen[v] == 0 and g.nblk[v] != Grid.N_ROCK:
++				seen[v] = 1
++				q[qt] = v
++				qt += 1
++	for i3 in total:
++		if seen[i3] == 0 and g.nblk[i3] != Grid.N_ROCK:
++			g.nblk[i3] = Grid.N_ROCK
++			g.nown[i3] = self
++			sealed += 1
++
++# --- clutter ----------------------------------------------------------------
++
++func _rubble() -> void:
++	for ru in layout["ruins"]:
++		var pos: Vector3 = ru["pos"]
++		var yaw := float(ru["yaw"])
++		var v := int(ru["v"])
++		_extra_add("ruin%d" % v, Art.ruin_mesh(v), Transform3D(Basis(Vector3.UP, yaw), pos))
++		var c := pos + Basis(Vector3.UP, yaw) * Vector3(1.3, 0, 0)
++		_block(G.grid.rect_footprint(c, yaw, 4.2, 2.8)["nav"], Grid.N_STATIC, self)
++	for hp in layout["heaps"]:
++		var pos2: Vector3 = hp["pos"]
++		var yaw2 := float(hp["yaw"])
++		_extra_add("heap", CityArt.heap_mesh(), Transform3D(Basis(Vector3.UP, yaw2), pos2))
++		_block(G.grid.rect_footprint(pos2, yaw2, 1.7, 1.3)["nav"], Grid.N_STATIC, self)
++		var s := SalvageSpot.new()
++		add_child(s)
++		s.setup(pos2, "", int(hp["scrap"]))
++		wrecks.append(s)
++
++# Wrecks with nothing left in them: one MultiMesh per model.
++func _dead_cars() -> void:
++	for w in layout["dead_cars"]:
++		var kind := SUBURB + String(w["model"])
++		var pos: Vector3 = w["pos"]
++		var yaw := float(w["yaw"])
++		_mm_add(kind, Transform3D(Basis(Vector3.UP, yaw), pos))
++		var fp: Dictionary = Art.footprint(kind)
++		var h: Vector2 = fp["half"]
++		var c: Vector3 = pos + Basis(Vector3.UP, yaw) * (fp["off"] as Vector3)
++		_block(G.grid.rect_footprint(c, yaw, maxf(0.6, h.x), maxf(0.6, h.y))["nav"], Grid.N_STATIC, self)
++
++func _extra_add(key: String, mesh: Mesh, xf: Transform3D) -> void:
++	if not _extra.has(key):
++		_extra[key] = {"mesh": mesh, "xforms": []}
++	_extra[key]["xforms"].append(xf)
++
++func _flush_extra() -> void:
++	for key in _extra:
++		var e: Dictionary = _extra[key]
++		var mm := MultiMesh.new()
++		mm.transform_format = MultiMesh.TRANSFORM_3D
++		mm.mesh = e["mesh"]
++		var xs: Array = e["xforms"]
++		mm.instance_count = xs.size()
++		for i in xs.size():
++			mm.set_instance_transform(i, xs[i])
++		var mmi := MultiMeshInstance3D.new()
++		mmi.name = "MM_" + key
++		mmi.multimesh = mm
++		mmi.material_override = Art.mat_vc
++		add_child(mmi)
++
++# The trees and rocks Decor scatters past the edge would stand inside the
++# skyline here.
++func _hide_outer_decor() -> void:
++	var decor := get_parent().get_node_or_null("Decor") if get_parent() else null
++	if decor == null:
++		return
++	for ch in decor.get_children():
++		if ch is MultiMeshInstance3D:
++			(ch as MultiMeshInstance3D).visible = false
++
++# --- spawning and survivors --------------------------------------------------
++
++# Spawn lanes are the street ends; keep the spread inside the street.
++func _entries() -> void:
++	var e: Dictionary = layout["entries"]
++	for edge in e:
++		var opts: Array = (e[edge] as Array).duplicate()
++		opts.shuffle()
++		var n := rng.randi_range(2, mini(3, opts.size()))
++		entries[edge] = opts.slice(0, n)
++
++func spawn_point(edge: int, r: RandomNumberGenerator) -> Vector3:
++	var h := Defs.HALF
++	var list: Array = entries.get(edge, [])
++	var along := 0.0
++	if not list.is_empty():
++		var en: Array = list[r.randi() % list.size()]
++		along = float(en[0]) + r.randf_range(-1.0, 1.0) * maxf(0.0, float(en[1]) - 3.5)
++	var out := r.randf_range(2.0, 7.0)
++	match edge:
++		0:
++			return Vector3(along, 0, -h - out)
++		1:
++			return Vector3(h + out, 0, along)
++		2:
++			return Vector3(along, 0, h + out)
++		_:
++			return Vector3(-h - out, 0, along)
++
++func survivor_points() -> Array[Vector3]:
++	var out: Array[Vector3] = super()
++	var g: Grid = G.grid
++	for p in spots:
++		var n := Defs.world_to_nav(p)
++		if g.ninb(n) and g.nblk[g.nidx(n)] == Grid.N_OPEN:
++			out.append(p)
++	return out
+diff -ruN src_orig/scripts/maps/city_layout.gd src/scripts/maps/city_layout.gd
+--- a/scripts/maps/city_layout.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/maps/city_layout.gd	2026-10-25 08:08:36.618728233 +0000
+@@ -0,0 +1,341 @@
++class_name CityLayout
++extends RefCounted
++# Downtown: a plaza in the middle walled in by low blocks, a ring avenue round
++# that, and cross streets running out to every edge. The horde comes in at the
++# street ends, so the streets and the plaza mouths are the chokepoints.
++# Block edges sit on odd metres so they line up with the 2 m build grid.
++const AVE_W := 12.0
++const ST_W := 8.0
++const PAVE_W := 3.0
++const EXT := 150.0
++const RING := 46.0
++const OUTER := 76.0
++const PLAZA := Rect2(-26.0, -23.0, 52.0, 46.0)
++const PROM := 3.0
++const GROUND_H := 4.2
++const FLOOR_H := 3.2
++const FACE_S := PI
++const FACE_N := 0.0
++const FACE_E := -PI * 0.5
++const FACE_W := PI * 0.5
++const LINES := [-EXT, -OUTER, -RING, 0.0, RING, OUTER, EXT]
++const PALETTES := [
++	[Color(0.56, 0.58, 0.6), Color(0.44, 0.47, 0.52), Color(0.62, 0.6, 0.55), Color(0.36, 0.4, 0.42)],
++	[Color(0.55, 0.3, 0.22), Color(0.62, 0.38, 0.27), Color(0.47, 0.31, 0.25), Color(0.6, 0.46, 0.36)],
++	[Color(0.7, 0.68, 0.62), Color(0.62, 0.62, 0.6), Color(0.72, 0.63, 0.5), Color(0.58, 0.6, 0.56)],
++	[Color(0.8, 0.74, 0.62), Color(0.74, 0.68, 0.56), Color(0.66, 0.62, 0.58), Color(0.77, 0.66, 0.52)],
++]
++
++static func data() -> Dictionary:
++	var d := {
++		"id": "city",
++		"hq": Vector3.ZERO,
++		"wave_mult": 1.2,
++		"roads": [],
++		"junctions": [],
++		"bulbs": [],
++		"lots": [],
++		"buildings": [],
++		"trees": [],
++		"props": [],
++		"wrecks": [],
++		"dead_cars": [],
++		"fences": [],
++		"drives": [],
++		"towers": [],
++		"grounds": [],
++		"ruins": [],
++		"heaps": [],
++		"spots": [],
++		"park": PLAZA,
++		"lawn": PLAZA.grow(-PROM),
++		"entries": {},
++	}
++	var r := RandomNumberGenerator.new()
++	r.seed = 7781
++	_roads(d)
++	_blocks(d, r)
++	_plaza(d)
++	_lots(d)
++	_street_furniture(d, r)
++	_wrecks(d)
++	_spots(d)
++	return d
++
++static func road_w(c: float) -> float:
++	return AVE_W if absf(absf(c) - RING) < 0.1 else ST_W
++
++static func _roads(d: Dictionary) -> void:
++	var R: Array = d["roads"]
++	for c in [-OUTER, -RING, RING, OUTER]:
++		R.append({"a": Vector3(-EXT, 0, c), "b": Vector3(EXT, 0, c), "w": road_w(c)})
++		R.append({"a": Vector3(c, 0, -EXT), "b": Vector3(c, 0, EXT), "w": road_w(c)})
++	R.append({"a": Vector3(-EXT, 0, 0), "b": Vector3(PLAZA.position.x, 0, 0), "w": ST_W})
++	R.append({"a": Vector3(PLAZA.end.x, 0, 0), "b": Vector3(EXT, 0, 0), "w": ST_W})
++	R.append({"a": Vector3(0, 0, -EXT), "b": Vector3(0, 0, PLAZA.position.y), "w": ST_W})
++	R.append({"a": Vector3(0, 0, PLAZA.end.y), "b": Vector3(0, 0, EXT), "w": ST_W})
++	var along: Array = []
++	for c in [-OUTER, -RING, 0.0, RING, OUTER]:
++		along.append([c, road_w(c) * 0.5 + PAVE_W])
++	for edge in 4:
++		d["entries"][edge] = along.duplicate(true)
++
++# Block interiors between road centrelines, minus road and pavement.
++static func _span(i: int) -> Vector2:
++	var a: float = LINES[i]
++	var b: float = LINES[i + 1]
++	var a_in := 0.0 if absf(a) >= EXT else road_w(a) * 0.5 + PAVE_W
++	var b_in := 0.0 if absf(b) >= EXT else road_w(b) * 0.5 + PAVE_W
++	return Vector2(a + a_in, b - b_in)
++
++static func _special(i: int, j: int) -> String:
++	var key := Vector2i(i, j)
++	var specials := {
++		Vector2i(4, 3): "carpark", Vector2i(1, 2): "carpark", Vector2i(3, 1): "rubble",
++		Vector2i(2, 4): "petrol", Vector2i(4, 1): "shop", Vector2i(1, 4): "shop",
++	}
++	return specials.get(key, "")
++
++static func _blocks(d: Dictionary, r: RandomNumberGenerator) -> void:
++	var h := Defs.HALF
++	for j in 6:
++		for i in 6:
++			var sx := _span(i)
++			var sz := _span(j)
++			var blk := Rect2(sx.x, sz.x, sx.y - sx.x, sz.y - sz.x)
++			if i in [2, 3] and j in [2, 3]:
++				_inner_quadrant(d, blk, r)
++				continue
++			if _special(i, j) != "":
++				continue
++			var edge := i == 0 or i == 5 or j == 0 or j == 5
++			if not edge:
++				d["grounds"].append({"r": blk, "kind": "pavement"})
++				_fill(d, blk, 1, false, r, true)
++				continue
++			# The part inside the map is solid blocks right up to the edge;
++			# the rest is skyline, drawn but not on the nav grid.
++			var inner := Rect2(Vector2(maxf(blk.position.x, -h), maxf(blk.position.y, -h)), Vector2.ZERO)
++			inner.end = Vector2(minf(blk.end.x, h), minf(blk.end.y, h))
++			d["grounds"].append({"r": blk, "kind": "pavement"})
++			if inner.size.x > 4.0 and inner.size.y > 4.0:
++				_fill(d, inner, 2, false, r, false)
++			var outs: Array = []
++			if blk.end.x > h:
++				outs.append(Rect2(h, blk.position.y, blk.end.x - h, blk.size.y))
++			if blk.position.x < -h:
++				outs.append(Rect2(blk.position.x, blk.position.y, -h - blk.position.x, blk.size.y))
++			var x0 := maxf(blk.position.x, -h)
++			var x1 := minf(blk.end.x, h)
++			if blk.end.y > h:
++				outs.append(Rect2(x0, h, x1 - x0, blk.end.y - h))
++			if blk.position.y < -h:
++				outs.append(Rect2(x0, blk.position.y, x1 - x0, -h - blk.position.y))
++			for o in outs:
++				_fill(d, o, 3, true, r, false)
++
++# The quarter of the ring round the plaza: an L of low blocks, with an alley
++# through it in some quarters.
++static func _inner_quadrant(d: Dictionary, q: Rect2, r: RandomNumberGenerator) -> void:
++	var north := q.position.y < 0.0
++	var east := q.position.x > 0.0
++	var front := Rect2(q.position.x, q.position.y if north else PLAZA.end.y, q.size.x, 0.0)
++	front.size.y = (PLAZA.position.y - q.position.y) if north else (q.end.y - PLAZA.end.y)
++	var side := Rect2(PLAZA.end.x if east else q.position.x, PLAZA.position.y if north else q.position.y, 0.0, 0.0)
++	side.size.x = (q.end.x - PLAZA.end.x) if east else (PLAZA.position.x - q.position.x)
++	side.size.y = (q.end.y - PLAZA.position.y) if north else (PLAZA.end.y - q.position.y)
++	d["grounds"].append({"r": front, "kind": "pavement"})
++	d["grounds"].append({"r": side, "kind": "pavement"})
++	# Alleys: NE runs north out of the plaza, SW south, NW west.
++	var cuts_front: Array = []
++	var cuts_side: Array = []
++	if north and east:
++		cuts_front.append(Vector2(19, 23))
++	elif not north and not east:
++		cuts_front.append(Vector2(-23, -19))
++	elif north and not east:
++		cuts_side.append(Vector2(-17, -13))
++	for piece in _cut(front, cuts_front, true):
++		_fill(d, piece, 0, false, r, false)
++	for piece in _cut(side, cuts_side, false):
++		_fill(d, piece, 0, false, r, false)
++
++static func _cut(rect: Rect2, cuts: Array, along_x: bool) -> Array:
++	var out: Array = []
++	var a := rect.position.x if along_x else rect.position.y
++	var e := rect.end.x if along_x else rect.end.y
++	for c in cuts:
++		if c.x > a:
++			out.append(_sub(rect, a, c.x, along_x))
++		a = c.y
++	if e > a:
++		out.append(_sub(rect, a, e, along_x))
++	return out
++
++static func _sub(rect: Rect2, a: float, b: float, along_x: bool) -> Rect2:
++	if along_x:
++		return Rect2(a, rect.position.y, b - a, rect.size.y)
++	return Rect2(rect.position.x, a, rect.size.x, b - a)
++
++# Split a block into buildings: frontages of 10-18 m along its long side,
++# two deep when the block is deep, sometimes a through-alley between.
++static func _fill(d: Dictionary, rect: Rect2, tier: int, out: bool, r: RandomNumberGenerator, alleys: bool) -> void:
++	var horiz := rect.size.x >= rect.size.y
++	var L := rect.size.x if horiz else rect.size.y
++	var D := rect.size.y if horiz else rect.size.x
++	var rows := 2 if D >= 24.0 else 1
++	var t := 0.0
++	var pieces: Array = []
++	while L - t > 0.5:
++		var w := float(r.randi_range(5, 9) * 2) if not out else float(r.randi_range(8, 13) * 2)
++		if L - t - w < 8.0:
++			w = L - t
++		pieces.append(Vector2(t, t + w))
++		t += w
++		if alleys and L - t > 12.0 and r.randf() < 0.25:
++			t += 4.0
++	for p in pieces:
++		var split := D
++		if rows == 2:
++			split = float(int(D * r.randf_range(0.4, 0.6) / 2.0) * 2)
++		for row in rows:
++			var d0 := 0.0 if row == 0 else split
++			var d1 := split if row == 0 else D
++			var b: Rect2
++			if horiz:
++				b = Rect2(rect.position.x + p.x, rect.position.y + d0, p.y - p.x, d1 - d0)
++			else:
++				b = Rect2(rect.position.x + d0, rect.position.y + p.x, d1 - d0, p.y - p.x)
++			_tower(d, b, tier, out, r)
++
++static func _tower(d: Dictionary, b: Rect2, tier: int, out: bool, r: RandomNumberGenerator, floors: int = 0, burnt: int = -1) -> void:
++	var lo: int = [3, 4, 5, 6][tier]
++	var hi: int = [4, 7, 9, 12][tier]
++	if floors <= 0:
++		floors = r.randi_range(lo, hi)
++		if minf(b.size.x, b.size.y) < 9.0:
++			floors = mini(floors, lo + 1)
++	var style := r.randi() % 4
++	var pal: Array = PALETTES[style]
++	var col: Color = (pal[r.randi() % pal.size()] as Color).darkened(r.randf_range(0.0, 0.12))
++	var is_burnt := r.randf() < 0.1 if burnt < 0 else burnt == 1
++	d["towers"].append({"r": b, "floors": floors, "style": style, "col": col, "seed": r.randi() % 256, "burnt": is_burnt, "out": out})
++
++static func _plaza(d: Dictionary) -> void:
++	var p := PLAZA
++	var g: Array = d["grounds"]
++	g.append({"r": Rect2(p.position.x, p.position.y, p.size.x, PROM), "kind": "pavement"})
++	g.append({"r": Rect2(p.position.x, p.end.y - PROM, p.size.x, PROM), "kind": "pavement"})
++	g.append({"r": Rect2(p.position.x, p.position.y + PROM, PROM, p.size.y - PROM * 2.0), "kind": "pavement"})
++	g.append({"r": Rect2(p.end.x - PROM, p.position.y + PROM, PROM, p.size.y - PROM * 2.0), "kind": "pavement"})
++	var T: Array = d["trees"]
++	var ring := [[-19, -16, "tree_oak"], [-8, -17, "tree_birch"], [9, -17, "tree_oak"], [19, -15, "tree_pine"],
++		[20, -4, "tree_birch"], [20, 9, "tree_oak"], [18, 17, "tree_birch"], [7, 17, "tree_pine"],
++		[-9, 17, "tree_oak"], [-19, 16, "tree_birch"], [-20, 5, "tree_oak"], [-20, -6, "tree_pine"]]
++	for t in ring:
++		T.append({"pos": Vector3(t[0], 0, t[1]), "model": t[2], "s": 0.9})
++	var P: Array = d["props"]
++	for b in [[-15, -12, 0.6], [15, -12, -0.6], [-15, 12, 2.5], [15, 12, -2.5], [-17, 0, FACE_E], [17, 0, FACE_W]]:
++		P.append({"pos": Vector3(b[0], 0, b[1]), "yaw": b[2], "model": "bench"})
++	for b in [[-13, -18], [13, 18], [-21, 11], [21, -10]]:
++		P.append({"pos": Vector3(b[0], 0, b[1]), "yaw": float(b[0]) * 0.3, "model": "bush_b" if int(b[0]) % 2 == 0 else "bush_a"})
++
++static func _lots(d: Dictionary) -> void:
++	var g: Array = d["grounds"]
++	for j in 6:
++		for i in 6:
++			var kind := _special(i, j)
++			if kind == "":
++				continue
++			var sx := _span(i)
++			var sz := _span(j)
++			var blk := Rect2(sx.x, sz.x, sx.y - sx.x, sz.y - sz.x)
++			match kind:
++				"carpark":
++					g.append({"r": blk, "kind": "asphalt"})
++				"rubble":
++					g.append({"r": blk, "kind": "gravel"})
++				_:
++					g.append({"r": blk, "kind": "pavement" if kind == "shop" else "asphalt"})
++	var B: Array = d["buildings"]
++	B.append({"pos": Vector3(-22, 0, 62), "yaw": FACE_N, "model": "petrol_station"})
++	B.append({"pos": Vector3(62, 0, -62.5), "yaw": FACE_S, "model": "corner_shop"})
++	B.append({"pos": Vector3(-62, 0, 62.5), "yaw": FACE_N, "model": "corner_shop"})
++	# The rubble lot: a burnt-out stump, collapsed walls and heaps to pick through.
++	var r := RandomNumberGenerator.new()
++	r.seed = 12
++	_tower(d, Rect2(31, -69, 6, 14), 0, false, r, 2, 1)
++	d["ruins"].append({"pos": Vector3(13, 0, -63), "yaw": 0.3, "v": 0})
++	d["ruins"].append({"pos": Vector3(24, 0, -61), "yaw": 2.6, "v": 1})
++	var H: Array = d["heaps"]
++	H.append({"pos": Vector3(19, 0, -66.5), "yaw": 0.4, "scrap": Defs.SALVAGE_SCRAP + 40})
++	H.append({"pos": Vector3(27, 0, -57.5), "yaw": 1.9, "scrap": Defs.SALVAGE_SCRAP + 40})
++	# Rubble spilt into the streets: they narrow a lane, never close one.
++	H.append({"pos": Vector3(-59, 0, -77.5), "yaw": 0.1, "scrap": Defs.SALVAGE_SCRAP})
++	H.append({"pos": Vector3(77.5, 0, 31), "yaw": 1.5, "scrap": Defs.SALVAGE_SCRAP})
++	H.append({"pos": Vector3(-30, 0, 78), "yaw": 3.0, "scrap": Defs.SALVAGE_SCRAP})
++	H.append({"pos": Vector3(-77.5, 0, -24), "yaw": 1.7, "scrap": Defs.SALVAGE_SCRAP})
++	var P: Array = d["props"]
++	for b in [[57, -57, 0.0], [67, -67, PI], [-57, 57, 0.0], [-67, 67, PI]]:
++		P.append({"pos": Vector3(b[0], 0, b[1]), "yaw": b[2], "model": "bins"})
++
++static func _street_furniture(d: Dictionary, r: RandomNumberGenerator) -> void:
++	var P: Array = d["props"]
++	var h := Defs.HALF
++	for rd in d["roads"]:
++		var a: Vector3 = rd["a"]
++		var b: Vector3 = rd["b"]
++		var w := float(rd["w"])
++		var along := (b - a).normalized()
++		var across := Vector3(-along.z, 0, along.x)
++		var l := a.distance_to(b)
++		var k := 0
++		var t := 10.0
++		while t < l:
++			var p := a + along * t
++			t += 22.0
++			if absf(p.x) > h - 6.0 or absf(p.z) > h - 6.0:
++				continue
++			var at: float = p.x if absf(along.x) > 0.5 else p.z
++			var near_x := false
++			for c in [-OUTER, -RING, 0.0, RING, OUTER]:
++				if absf(at - c) < 11.0:
++					near_x = true
++			if near_x:
++				continue
++			k += 1
++			var side := 1.0 if k % 2 == 0 else -1.0
++			var lp := p + across * side * (w * 0.5 + 0.9)
++			# The lamp arm points along local -z: turn it to hang over the road.
++			var to_road := -across * side
++			P.append({"pos": lp, "yaw": atan2(-to_road.x, -to_road.z), "model": "streetlight"})
++			if r.randf() < 0.35:
++				P.append({"pos": p + across * -side * (w * 0.5 + 1.2) + along * 3.0, "yaw": atan2(-along.x, -along.z), "model": "bins"})
++
++static func _wrecks(d: Dictionary) -> void:
++	var W: Array = d["wrecks"]
++	var w := [
++		[22, -45, 84, "school_bus_wreck"], [-30, -47.5, 100, "car_sedan_wreck"], [-46.5, -20, 8, "car_hatch_wreck"],
++		[45, 22, -10, "van_wreck"], [60, 46.5, 95, "car_hatch_wreck"], [0.5, -60, 5, "car_sedan_wreck"],
++		[-75, 30, 172, "van_wreck"], [-20, 76.5, 92, "school_bus_wreck"], [36, -1, -84, "car_sedan_wreck"],
++		[59, 15, 0, "car_sedan_wreck"], [65, 24, 190, "car_hatch_wreck"], [-60, -15, 0, "car_sedan_wreck"],
++		[-11, 60, 12, "car_hatch_wreck"],
++	]
++	for e in w:
++		W.append({"pos": Vector3(e[0], 0, e[1]), "yaw": deg_to_rad(float(e[2])), "model": e[3]})
++	var C: Array = d["dead_cars"]
++	var c := [
++		[47.8, 28, 22, "car_sedan_wreck"], [43.5, 31, -35, "car_hatch_wreck"], [76.5, -20, -6, "car_sedan_wreck"],
++		[-38, 0.8, 88, "car_hatch_wreck"], [30, 75, 75, "car_sedan_wreck"], [1.5, 34, -15, "car_hatch_wreck"],
++		[-60, 45, 80, "van_wreck"], [-46, 60, 176, "car_sedan_wreck"], [62, -76.5, 98, "van_wreck"],
++		[-65, -28, 186, "car_hatch_wreck"], [64, 30, 4, "van_wreck"], [-1.5, 61, 170, "car_sedan_wreck"],
++		[-62, -46.5, 263, "car_sedan_wreck"], [76, 62, 8, "car_hatch_wreck"],
++	]
++	for e in c:
++		C.append({"pos": Vector3(e[0], 0, e[1]), "yaw": deg_to_rad(float(e[2])), "model": e[3]})
++
++static func _spots(d: Dictionary) -> void:
++	var S: Array = d["spots"]
++	for p in [[62, 20], [-62, -22], [10, -57], [-12, 52], [0, -66], [66, 0], [0, 64], [-66, 0],
++			[52, -76], [-60, 76], [76, 52], [-76, -60], [30, -46], [-46, 30], [62, -52], [-62, 52]]:
++		S.append(Vector3(p[0], 0, p[1]))
 diff -ruN src_orig/scripts/maps/map_builder.gd src/scripts/maps/map_builder.gd
 --- a/scripts/maps/map_builder.gd	2026-10-24 19:02:37.756329277 +0000
 +++ b/scripts/maps/map_builder.gd	2026-10-25 07:01:57.608901035 +0000

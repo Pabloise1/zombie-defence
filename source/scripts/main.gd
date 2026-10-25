@@ -717,7 +717,7 @@ func _setup_world() -> void:
 	decor.name = "Decor"
 	add_child(decor)
 	decor.setup(grid, 1337, G.map_id == "fields")
-	Art.use_lawn(G.map_id == "suburb")
+	Art.use_lawn(G.map_id == "suburb" or G.map_id == "city")
 	terrain.setup(grid)
 	G.terrain = terrain
 	flow = FlowField.new(grid)
@@ -781,15 +781,15 @@ func _setup_world() -> void:
 	add_child(logi)
 	G.logi = logi
 	logi.setup(decor.salvage_spots())
-	if G.map_id == "suburb":
-		var mb := MapBuilder.new()
+	if G.map_id == "suburb" or G.map_id == "city":
+		var mb: MapBuilder = CityBuilder.new() if G.map_id == "city" else MapBuilder.new()
 		mb.name = "Map"
 		add_child(mb)
 		G.map = mb
 		map_seed = G.rng.randi()
 		if not G.resume.is_empty():
 			map_seed = int(G.resume.get("seed", map_seed))
-		mb.build(SuburbLayout.data(), map_seed)
+		mb.build(CityLayout.data() if G.map_id == "city" else SuburbLayout.data(), map_seed)
 		people.ruins = mb.survivor_points()
 	cam = CameraRig.new()
 	cam.name = "Camera"
