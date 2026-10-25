@@ -102,6 +102,8 @@ class Settings:
 		var out := []
 		if G.main and G.main.quality:
 			out.append("Graphics: %s  ·  %s" % [G.main.quality.label(), G.main.quality.fps_label()])
+		if G.main:
+			out.append("Zombies: speed %d%%  ·  horde %d%%" % [int(round(G.main.zombie_speed * 100.0)), int(round(G.main.horde_mult * 100.0))])
 		out.append_array(Array(diagnostic().split("\n")))
 		return out
 	func card_buttons() -> Array:
@@ -110,7 +112,12 @@ class Settings:
 		if G.main and G.main.quality:
 			q = QualityManager.MODE_NAMES[G.main.quality.mode].to_upper()
 			f = str(G.main.quality.fps_cap) if G.main.quality.fps_cap > 0 else "MAX"
-		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
+		var zs := 100
+		var hm := 100
+		if G.main:
+			zs = int(round(G.main.zombie_speed * 100.0))
+			hm = int(round(G.main.horde_mult * 100.0))
+		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["zspeed", "SPEED: %d%%" % zs, true], ["horde", "HORDE: %d%%" % hm, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
 
 class Ask:
 	extends RefCounted

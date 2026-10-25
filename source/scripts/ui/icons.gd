@@ -334,6 +334,8 @@ static func for_action(id: String) -> String:
 			return "hammer"
 		"expand":
 			return "expand"
+		"zspeed", "horde":
+			return "zombie"
 		"auto_rebuild", "quality", "fps":
 			return "auto"
 		"floor":

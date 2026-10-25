@@ -264,6 +264,23 @@ diff -ruN src_orig/scripts/buildings/room_block.gd src/scripts/buildings/room_bl
  	if floor_job != null and is_instance_valid(floor_job):
  		out.append("Building storey %d: %d%%" % [storeys + 1, int(floor_job.progress * 100.0)])
  	return out
+diff -ruN src_orig/scripts/buildings/supply_device.gd src/scripts/buildings/supply_device.gd
+--- a/scripts/buildings/supply_device.gd	2026-10-24 19:02:37.755222448 +0000
++++ b/scripts/buildings/supply_device.gd	2026-10-25 00:34:49.177070200 +0000
+@@ -12,7 +12,12 @@
+ 		"ammo_point":
+ 			return ["Ammo crates %d/%d  ·  loaders fill it from the depot" % [crates, store_cap()]]
+ 		"radio":
+-			return ["Calls in more survivors each wave"]
++			var n: int = G.buildings.count_built("radio")
++			var used := mini(n, 2)
++			var line := "Calls in 1 more survivor group each wave  ·  %d/2 radios working" % used
++			if n > 2:
++				return [line, "Only 2 radios help: extras do nothing"]
++			return [line]
+ 		"fuel":
+ 			var n := 0
+ 			for b in G.buildings.built_of("flame"):
 diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 --- a/scripts/civilian.gd	2026-10-24 19:02:37.755483804 +0000
 +++ b/scripts/civilian.gd	2026-10-24 20:03:49.628893333 +0000
@@ -538,27 +555,33 @@ diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
  	var bd := INF
 diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-25 00:05:32.201768615 +0000
-@@ -26,6 +26,9 @@
++++ b/scripts/main.gd	2026-10-25 00:35:00.054375316 +0000
+@@ -26,6 +26,14 @@
  var phase := "title"
  var phase_t := 0.0
  var waves_cleared := 0
 +var repair_spent := 0
 +var map_seed := 0
++# Player difficulty settings (Settings card), kept in settings.cfg.
++const SPEED_CHOICES := [0.75, 1.0, 1.25, 1.5]
++const HORDE_CHOICES := [0.5, 0.75, 1.0, 1.5, 2.0]
++var zombie_speed := 1.0
++var horde_mult := 1.0
 +var _save_t := 0.0
  var test_mode := false
  var manual_clock := false
  var _queue: Array = []
-@@ -51,6 +54,8 @@
+@@ -51,6 +59,9 @@
  func _ready() -> void:
  	G.reset()
  	G.main = self
++	_load_game_settings()
 +	if not G.resume.is_empty():
 +		G.map_id = String(G.resume["map"])
  	for a in OS.get_cmdline_user_args():
  		if a.begins_with("--map="):
  			G.map_id = a.substr(6)
-@@ -70,6 +75,11 @@
+@@ -70,6 +81,11 @@
  		hud.show_title(true)
  		cam.focus(Defs.hq_center() + Vector3(0, 0, 6), 46.0)
  		cam.snap()
@@ -570,7 +593,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	var args := OS.get_cmdline_user_args()
  	for a in args:
  		_dev_arg(a)
-@@ -768,7 +778,10 @@
+@@ -768,7 +784,10 @@
  		mb.name = "Map"
  		add_child(mb)
  		G.map = mb
@@ -582,7 +605,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  		people.ruins = mb.survivor_points()
  	cam = CameraRig.new()
  	cam.name = "Camera"
-@@ -790,6 +803,7 @@
+@@ -790,6 +809,7 @@
  	hud.tool_pressed.connect(_on_tool_pressed)
  	hud.start_wave_pressed.connect(start_wave)
  	hud.play_pressed.connect(_on_play)
@@ -590,7 +613,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	hud.restart_pressed.connect(_on_restart)
  	hud.card_action.connect(_on_card_action)
  	builder.tool_changed.connect(_on_tool_changed)
-@@ -935,6 +949,10 @@
+@@ -935,6 +955,10 @@
  	match phase:
  		"build":
  			phase_t -= dt
@@ -601,10 +624,20 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  			if phase_t <= 0.0 and not test_mode:
  				start_wave()
  		"wave":
-@@ -1164,6 +1182,10 @@
+@@ -1164,6 +1188,20 @@
  			quality.next_mode()
  			_ui("ui_tap")
  			hud.toast("Graphics: %s" % quality.label())
++		"zspeed":
++			zombie_speed = _next_choice(SPEED_CHOICES, zombie_speed)
++			_save_game_settings()
++			_ui("ui_tap")
++			hud.toast("Zombie speed %d%%  ·  new zombies from now on" % int(round(zombie_speed * 100.0)))
++		"horde":
++			horde_mult = _next_choice(HORDE_CHOICES, horde_mult)
++			_save_game_settings()
++			_ui("ui_tap")
++			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
 +		"fps":
 +			quality.next_fps()
 +			_ui("ui_tap")
@@ -612,7 +645,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _card_result(why: String, ok_text: String) -> void:
  	if why != "":
-@@ -1191,7 +1213,7 @@
+@@ -1191,7 +1229,7 @@
  		_ui("zone_breached")
  		cam.shake(0.4)
  	elif secured:
@@ -621,7 +654,52 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _on_tool_changed(t: String) -> void:
  	var h := ""
-@@ -1267,6 +1289,7 @@
+@@ -1230,14 +1268,40 @@
+ 	get_tree().reload_current_scene()
+ 
+ func wave_size(w: int) -> int:
++	return maxi(1, int(round(_base_wave_size(w) * horde_mult)))
++
++func _base_wave_size(w: int) -> float:
+ 	var mult: float = float(G.map.layout.get("wave_mult", 1.0)) if G.map else 1.0
+ 	if w == 1:
+-		return 24
++		return 24.0
+ 	if w == 2:
+-		return 44
++		return 44.0
+ 	if w == 3:
+-		return 60
+-	return int(round(60.0 * pow(1.38, w - 3) * mult))
++		return 60.0
++	return 60.0 * pow(1.38, w - 3) * mult
++
++func _load_game_settings() -> void:
++	if test_mode:
++		return
++	var cf := ConfigFile.new()
++	if cf.load(QualityManager.SETTINGS_PATH) == OK:
++		var sp := float(cf.get_value("game", "zombie_speed", 1.0))
++		var hm := float(cf.get_value("game", "horde", 1.0))
++		zombie_speed = sp if SPEED_CHOICES.has(sp) else 1.0
++		horde_mult = hm if HORDE_CHOICES.has(hm) else 1.0
++
++func _save_game_settings() -> void:
++	if test_mode:
++		return
++	var cf := ConfigFile.new()
++	cf.load(QualityManager.SETTINGS_PATH)
++	cf.set_value("game", "zombie_speed", zombie_speed)
++	cf.set_value("game", "horde", horde_mult)
++	cf.save(QualityManager.SETTINGS_PATH)
++
++static func _next_choice(choices: Array, v: float) -> float:
++	var i := choices.find(v)
++	return choices[(i + 1) % choices.size()]
+ 
+ func _plan_edges() -> void:
+ 	var n := 1
+@@ -1267,6 +1331,7 @@
  func start_wave() -> void:
  	if phase != "build":
  		return
@@ -629,7 +707,16 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	phase = "wave"
  	zombies.wave = wave
  	_wave_t = 0.0
-@@ -1303,14 +1326,15 @@
+@@ -1276,7 +1341,7 @@
+ 	var runner_frac := 0.0
+ 	if wave >= 3:
+ 		runner_frac = minf(0.3, 0.1 + 0.025 * (wave - 3))
+-	var brutes := brute_count(wave)
++	var brutes := mini(count, int(round(brute_count(wave) * horde_mult)))
+ 	for i in count - brutes:
+ 		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)
+ 	_queue.shuffle()
+@@ -1303,14 +1368,15 @@
  
  func _spawn_step(dt: float) -> void:
  	_spawn_t -= dt
@@ -647,7 +734,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  				break
  			var kind: int = _queue.pop_back()
  			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
-@@ -1346,7 +1370,12 @@
+@@ -1346,7 +1412,12 @@
  	waves_cleared = wave
  	var bonus := wave_bonus()
  	add_supplies(bonus)
@@ -661,7 +748,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	_ui("wave_cleared")
  	logi.on_wave_cleared()
  	wave_cleared.emit(wave)
-@@ -1354,14 +1383,47 @@
+@@ -1354,14 +1425,47 @@
  	phase = "build"
  	phase_t = Defs.BUILD_PHASE_TIME
  	_plan_edges()
@@ -1549,13 +1636,15 @@ diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
 +			p.add_job(j)
 diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
 --- a/scripts/ui/card_models.gd	2026-10-24 19:02:37.754539227 +0000
-+++ b/scripts/ui/card_models.gd	2026-10-24 19:04:07.169066872 +0000
-@@ -101,14 +101,16 @@
++++ b/scripts/ui/card_models.gd	2026-10-25 00:34:49.176645065 +0000
+@@ -101,14 +101,23 @@
  	func card_lines() -> Array:
  		var out := []
  		if G.main and G.main.quality:
 -			out.append("Graphics: %s" % G.main.quality.label())
 +			out.append("Graphics: %s  ·  %s" % [G.main.quality.label(), G.main.quality.fps_label()])
++		if G.main:
++			out.append("Zombies: speed %d%%  ·  horde %d%%" % [int(round(G.main.zombie_speed * 100.0)), int(round(G.main.horde_mult * 100.0))])
  		out.append_array(Array(diagnostic().split("\n")))
  		return out
  	func card_buttons() -> Array:
@@ -1565,7 +1654,12 @@ diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
  			q = QualityManager.MODE_NAMES[G.main.quality.mode].to_upper()
 -		return [["quality", "QUALITY: %s" % q, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
 +			f = str(G.main.quality.fps_cap) if G.main.quality.fps_cap > 0 else "MAX"
-+		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
++		var zs := 100
++		var hm := 100
++		if G.main:
++			zs = int(round(G.main.zombie_speed * 100.0))
++			hm = int(round(G.main.horde_mult * 100.0))
++		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["zspeed", "SPEED: %d%%" % zs, true], ["horde", "HORDE: %d%%" % hm, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
  
  class Ask:
  	extends RefCounted
@@ -1640,12 +1734,14 @@ diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
  	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
 diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
-+++ b/scripts/ui/icons.gd	2026-10-24 19:04:07.169619717 +0000
-@@ -334,7 +334,7 @@
++++ b/scripts/ui/icons.gd	2026-10-25 00:34:49.176842333 +0000
+@@ -334,7 +334,9 @@
  			return "hammer"
  		"expand":
  			return "expand"
 -		"auto_rebuild", "quality":
++		"zspeed", "horde":
++			return "zombie"
 +		"auto_rebuild", "quality", "fps":
  			return "auto"
  		"floor":
@@ -1662,3 +1758,15 @@ diff -ruN src_orig/scripts/ui/world_overlay.gd src/scripts/ui/world_overlay.gd
  					var rf: float = float(b.reserve) / float(b.reserve_max)
  					_bar(ap + Vector2(0, 7), 30.0 * zoom, 3.0, rf, Color(0.85, 0.55, 0.2))
  	if G.zombies:
+diff -ruN src_orig/scripts/zombie.gd src/scripts/zombie.gd
+--- a/scripts/zombie.gd	2026-10-24 19:02:37.756627217 +0000
++++ b/scripts/zombie.gd	2026-10-25 00:34:49.176350963 +0000
+@@ -154,6 +154,8 @@
+ 			dmg = Defs.Z_DMG[0]
+ 			reward = Defs.REWARD[0]
+ 	hp = max_hp
++	if G.main:
++		speed *= G.main.zombie_speed
+ 	scale = Vector3(s, s, s)
+ 	model.rotation = Vector3.ZERO
+ 	model.position = Vector3.ZERO

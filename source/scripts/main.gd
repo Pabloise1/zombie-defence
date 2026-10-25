@@ -28,6 +28,11 @@ var phase_t := 0.0
 var waves_cleared := 0
 var repair_spent := 0
 var map_seed := 0
+# Player difficulty settings (Settings card), kept in settings.cfg.
+const SPEED_CHOICES := [0.75, 1.0, 1.25, 1.5]
+const HORDE_CHOICES := [0.5, 0.75, 1.0, 1.5, 2.0]
+var zombie_speed := 1.0
+var horde_mult := 1.0
 var _save_t := 0.0
 var test_mode := false
 var manual_clock := false
@@ -54,6 +59,7 @@ const GOAL_TEXT := "Wall in your HQ to make a safe zone"
 func _ready() -> void:
 	G.reset()
 	G.main = self
+	_load_game_settings()
 	if not G.resume.is_empty():
 		G.map_id = String(G.resume["map"])
 	for a in OS.get_cmdline_user_args():
@@ -1182,6 +1188,16 @@ func _on_card_action(id: String, target) -> void:
 			quality.next_mode()
 			_ui("ui_tap")
 			hud.toast("Graphics: %s" % quality.label())
+		"zspeed":
+			zombie_speed = _next_choice(SPEED_CHOICES, zombie_speed)
+			_save_game_settings()
+			_ui("ui_tap")
+			hud.toast("Zombie speed %d%%  ·  new zombies from now on" % int(round(zombie_speed * 100.0)))
+		"horde":
+			horde_mult = _next_choice(HORDE_CHOICES, horde_mult)
+			_save_game_settings()
+			_ui("ui_tap")
+			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
 		"fps":
 			quality.next_fps()
 			_ui("ui_tap")
@@ -1252,14 +1268,40 @@ func _on_restart() -> void:
 	get_tree().reload_current_scene()
 
 func wave_size(w: int) -> int:
+	return maxi(1, int(round(_base_wave_size(w) * horde_mult)))
+
+func _base_wave_size(w: int) -> float:
 	var mult: float = float(G.map.layout.get("wave_mult", 1.0)) if G.map else 1.0
 	if w == 1:
-		return 24
+		return 24.0
 	if w == 2:
-		return 44
+		return 44.0
 	if w == 3:
-		return 60
-	return int(round(60.0 * pow(1.38, w - 3) * mult))
+		return 60.0
+	return 60.0 * pow(1.38, w - 3) * mult
+
+func _load_game_settings() -> void:
+	if test_mode:
+		return
+	var cf := ConfigFile.new()
+	if cf.load(QualityManager.SETTINGS_PATH) == OK:
+		var sp := float(cf.get_value("game", "zombie_speed", 1.0))
+		var hm := float(cf.get_value("game", "horde", 1.0))
+		zombie_speed = sp if SPEED_CHOICES.has(sp) else 1.0
+		horde_mult = hm if HORDE_CHOICES.has(hm) else 1.0
+
+func _save_game_settings() -> void:
+	if test_mode:
+		return
+	var cf := ConfigFile.new()
+	cf.load(QualityManager.SETTINGS_PATH)
+	cf.set_value("game", "zombie_speed", zombie_speed)
+	cf.set_value("game", "horde", horde_mult)
+	cf.save(QualityManager.SETTINGS_PATH)
+
+static func _next_choice(choices: Array, v: float) -> float:
+	var i := choices.find(v)
+	return choices[(i + 1) % choices.size()]
 
 func _plan_edges() -> void:
 	var n := 1
@@ -1299,7 +1341,7 @@ func start_wave() -> void:
 	var runner_frac := 0.0
 	if wave >= 3:
 		runner_frac = minf(0.3, 0.1 + 0.025 * (wave - 3))
-	var brutes := brute_count(wave)
+	var brutes := mini(count, int(round(brute_count(wave) * horde_mult)))
 	for i in count - brutes:
 		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)
 	_queue.shuffle()

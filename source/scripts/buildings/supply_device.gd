@@ -12,7 +12,12 @@ func card_lines() -> Array:
 		"ammo_point":
 			return ["Ammo crates %d/%d  ·  loaders fill it from the depot" % [crates, store_cap()]]
 		"radio":
-			return ["Calls in more survivors each wave"]
+			var n: int = G.buildings.count_built("radio")
+			var used := mini(n, 2)
+			var line := "Calls in 1 more survivor group each wave  ·  %d/2 radios working" % used
+			if n > 2:
+				return [line, "Only 2 radios help: extras do nothing"]
+			return [line]
 		"fuel":
 			var n := 0
 			for b in G.buildings.built_of("flame"):

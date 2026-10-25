@@ -154,6 +154,8 @@ func reset(k: int, pos: Vector3, wave: int) -> void:
 			dmg = Defs.Z_DMG[0]
 			reward = Defs.REWARD[0]
 	hp = max_hp
+	if G.main:
+		speed *= G.main.zombie_speed
 	scale = Vector3(s, s, s)
 	model.rotation = Vector3.ZERO
 	model.position = Vector3.ZERO
