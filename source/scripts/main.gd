@@ -1198,6 +1198,10 @@ func _on_card_action(id: String, target) -> void:
 			_save_game_settings()
 			_ui("ui_tap")
 			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
+		"raise":
+			_card_result(target.raise_one(), "Workers will add a floor")
+		"raise_all":
+			_card_result(target.raise_group(), "Workers will raise the fort")
 		"fps":
 			quality.next_fps()
 			_ui("ui_tap")
@@ -1249,7 +1253,9 @@ func _on_tool_changed(t: String) -> void:
 			h = "Tap ground or a glowing slot, then tick"
 		elif t == "wall" or t == "concrete":
 			h = "Tap points. Drag to look. Tick to build"
-		elif t == "wire" or t == "dig":
+		elif t.begins_with("fort_"):
+			h = "Tap the start, tap the end, then tick. Tap a module for floors"
+		elif bool(Defs.BUILD[t].get("line", false)):
 			h = "Tap the start, tap the end, then tick"
 		elif not Defs.is_prefab(t):
 			h = "Tap to place, then tick"

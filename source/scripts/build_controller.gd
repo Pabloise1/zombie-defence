@@ -61,7 +61,7 @@ func is_wall_tool() -> bool:
 	return tool == "wall" or tool == "concrete"
 
 func _is_line_tool() -> bool:
-	return tool == "dig" or tool == "wire"
+	return bool(Defs.BUILD.get(tool, {}).get("line", false))
 
 func _is_gun_tool() -> bool:
 	return Defs.MOUNTABLE.has(tool)

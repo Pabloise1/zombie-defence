@@ -254,6 +254,18 @@ const BUILD := {
 		"prefab": true, "half": Vector2(2.0, 1.5), "model": "clinic", "unlock": 3, "heal": 5.0, "heal_range": 14.0,
 		"hint": "Drag it, turn the handle, then tick", "about": "Heals everyone within 14 m",
 	},
+	"fort_wood": {
+		"name": "Wood Fort", "long": "Wooden Fort Module", "cost": 25, "time": 4.0, "hp": 700.0, "hp_per_level": 700.0,
+		"raise_cost": 30, "raise_time": 6.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true,
+		"ground": true, "trench": false, "line": true, "model": "fort_wood", "slot_bonus": 0.15,
+		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
+	},
+	"fort_concrete": {
+		"name": "Concrete", "long": "Concrete Fort Module", "cost": 45, "time": 7.0, "hp": 1600.0, "hp_per_level": 1600.0,
+		"raise_cost": 55, "raise_time": 10.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true, "unlock": 3,
+		"ground": true, "trench": false, "line": true, "model": "fort_concrete", "slot_bonus": 0.15,
+		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
+	},
 	"water_tower": {
 		"name": "Water Tw", "long": "Water Tower", "cost": 200, "time": 22.0, "hp": 2200.0, "blocks": true, "zcost": 6.0,
 		"prefab": true, "half": Vector2(1.5, 1.5), "model": "water_tower", "slot_bonus": 0.8, "unlock": 4,
@@ -314,7 +326,7 @@ const TABS := [
 	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
 	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
 	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
-	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
+	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
 ]
@@ -322,7 +334,7 @@ const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "concrete", "
 	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
 	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
 	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
-	"water_tower", "container", "pillbox", "armory", "scrapyard"]
+	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete"]
 const MAP_BUILDINGS := {
 	"house_two_storey": {
 		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,

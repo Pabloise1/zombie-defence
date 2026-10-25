@@ -1,7 +1,7 @@
 diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 --- a/scripts/art.gd	2026-10-24 19:02:37.756440030 +0000
-+++ b/scripts/art.gd	2026-10-25 01:16:18.253114839 +0000
-@@ -727,6 +727,42 @@
++++ b/scripts/art.gd	2026-10-25 06:29:50.931715797 +0000
+@@ -727,6 +727,45 @@
  			_mi(_cached("scrap_bundle", _mesh_scrap_bundle), mat_vc_metal, root, "Body")
  		"fetcher":
  			_build_worker(root, true)
@@ -21,6 +21,9 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +		"clinic":
 +			_mi(_cached("clinic", _mesh_clinic), mat_vc, root, "Body")
 +			_marker(root, "Door", Vector3(0, 0, 1.9))
++		"fort_wood", "fort_concrete":
++			_mi(fort_module_mesh(kind == "fort_concrete", [0], 15), mat_vc, root, "Body")
++			_marker(root, "RoofSlot1", Vector3(0, 3.25, 0))
 +		"water_tower":
 +			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
 +			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
@@ -44,7 +47,7 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
  		_:
  			var k := MeshKit.new()
  			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
-@@ -846,6 +882,143 @@
+@@ -846,6 +885,186 @@
  	k.box(Vector3(0.6, 0.4, 0.5), Vector3(0.5, 0.45, 0.4), C_OLIVE)
  	return k.build()
  
@@ -98,6 +101,49 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +		k.box(Vector3(0.7, 0.6, 0.05), Vector3(x, 1.7, 1.42), Color(0.45, 0.6, 0.65))
 +	k.box(Vector3(1.6, 0.08, 0.9), Vector3(0, 2.25, 1.85), white)
 +	return k.build()
++
++# One 2 m fort module. masks[l] says which sides (N, E, S, W bits) join a
++# neighbour on floor l, so no wall is drawn there; par says which roof edges
++# get a sandbag parapet.
++func fort_module_mesh(concrete: bool, masks: Array, par: int) -> ArrayMesh:
++	var key := "fort_%s_%s_%d" % ["c" if concrete else "w", str(masks), par]
++	if _meshes.has(key):
++		return _meshes[key]
++	var k := MeshKit.new()
++	var wall := C_CONCRETE if concrete else C_WOOD
++	var trim := C_CONCRETE_DK if concrete else C_WOOD_DK
++	var lh := 3.0
++	var dirs := [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
++	k.box(Vector3(2.0, 0.2, 2.0), Vector3(0, 0.1, 0), trim)
++	for l in masks.size():
++		var y0 := l * lh
++		var m: int = masks[l]
++		for cx in [-0.86, 0.86]:
++			for cz in [-0.86, 0.86]:
++				k.box(Vector3(0.28, lh, 0.28), Vector3(cx, y0 + lh * 0.5, cz), trim)
++		for i in 4:
++			if m & (1 << i):
++				continue
++			var d: Vector3 = dirs[i]
++			var rot := Vector3(0, PI * 0.5, 0) if d.x != 0.0 else Vector3.ZERO
++			var o := d * 0.86
++			k.box(Vector3(1.72, 1.25, 0.26), o + Vector3(0, y0 + 0.75, 0), wall, rot)
++			k.box(Vector3(1.72, 1.15, 0.26), o + Vector3(0, y0 + 2.42, 0), wall, rot)
++			k.box(Vector3(0.5, 0.45, 0.26), o + Vector3(0, y0 + 1.6, 0), wall, rot)
++			k.box(Vector3(1.8, 0.1, 0.34), o + Vector3(0, y0 + 1.36, 0) + d * 0.04, trim, rot)
++		k.box(Vector3(2.0, 0.22, 2.0), Vector3(0, y0 + lh + 0.01, 0), trim)
++	var top := masks.size() * lh + 0.12
++	for i in 4:
++		if not (par & (1 << i)):
++			continue
++		var d2: Vector3 = dirs[i]
++		var rot2 := Vector3(0, PI * 0.5, 0) if d2.x != 0.0 else Vector3.ZERO
++		for j in 3:
++			var along := Vector3(-d2.z, 0, d2.x) * (-0.62 + j * 0.62)
++			k.box(Vector3(0.6, 0.32, 0.36), d2 * 0.82 + along + Vector3(0, top + 0.16, 0), C_FABRIC if not concrete else C_SAND, rot2)
++	var mesh := k.build()
++	_meshes[key] = mesh
++	return mesh
 +
 +func _mesh_water_tower() -> ArrayMesh:
 +	var k := MeshKit.new()
@@ -188,6 +234,18 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
  func _mesh_fuel_tank() -> ArrayMesh:
  	var k := MeshKit.new()
  	k.box(Vector3(0.2, 0.5, 1.2), Vector3(-0.6, 0.25, 0), C_WOOD_DK)
+diff -ruN src_orig/scripts/build_controller.gd src/scripts/build_controller.gd
+--- a/scripts/build_controller.gd	2026-10-24 19:02:37.755652148 +0000
++++ b/scripts/build_controller.gd	2026-10-25 06:29:50.934582121 +0000
+@@ -61,7 +61,7 @@
+ 	return tool == "wall" or tool == "concrete"
+ 
+ func _is_line_tool() -> bool:
+-	return tool == "dig" or tool == "wire"
++	return bool(Defs.BUILD.get(tool, {}).get("line", false))
+ 
+ func _is_gun_tool() -> bool:
+ 	return Defs.MOUNTABLE.has(tool)
 diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
 --- a/scripts/building.gd	2026-10-24 19:02:37.754757495 +0000
 +++ b/scripts/building.gd	2026-10-25 01:26:55.134913219 +0000
@@ -342,6 +400,260 @@ diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
  func is_wallish() -> bool:
  	return rect
  
+diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
+--- a/scripts/building_manager.gd	2026-10-24 19:02:37.756247153 +0000
++++ b/scripts/building_manager.gd	2026-10-25 06:29:50.933607155 +0000
+@@ -29,6 +29,8 @@
+ 			return StairsTower.new()
+ 		"helipad", "helipad_large":
+ 			return Helipad.new()
++		"fort_wood", "fort_concrete":
++			return FortModule.new()
+ 	if Defs.is_prefab(kind):
+ 		return PrefabBuilding.new()
+ 	match kind:
+diff -ruN src_orig/scripts/buildings/fort_module.gd src/scripts/buildings/fort_module.gd
+--- a/scripts/buildings/fort_module.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/buildings/fort_module.gd	2026-10-25 06:31:20.729332240 +0000
+@@ -0,0 +1,238 @@
++class_name FortModule
++extends Building
++# A 2 m fort block you drag out in rows. Touching modules join up: shared
++# walls open out, outer walls get firing slits, and roofs at the same height
++# run on as one walkway. Raise a module (or the whole fort) floor by floor up
++# to max_levels. Every module has a roof gun slot and one soldier per floor.
++const LEVEL_H := 3.0
++const SIDES := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
++var levels := 1
++var raising := false
++var raise_progress := 0.0
++var _slot_node: Node3D
++
++func _make_model() -> void:
++	model = Node3D.new()
++	model.name = "Fort"
++	add_child(model)
++	if mounted.is_empty():
++		mounted.append(null)
++	_rebuild_visual()
++
++func _concrete() -> bool:
++	return kind == "fort_concrete"
++
++func neighbour(d: Vector2i):
++	var c := cell + d
++	if not G.grid.inb(c):
++		return null
++	var o = G.grid.occ[G.grid.idx(c)]
++	if o is FortModule and is_instance_valid(o) and o.state != DEAD:
++		return o
++	return null
++
++func _rebuild_visual() -> void:
++	for ch in model.get_children():
++		ch.queue_free()
++	var masks := []
++	var par := 0
++	for l in levels:
++		var m := 0
++		for i in 4:
++			var n = neighbour(SIDES[i])
++			if n != null and n.levels > l and n.state == state:
++				m |= 1 << i
++		masks.append(m)
++	for i in 4:
++		var n2 = neighbour(SIDES[i])
++		if n2 == null or n2.levels < levels or n2.state != state:
++			par |= 1 << i
++	var mi := MeshInstance3D.new()
++	mi.name = "Body"
++	mi.mesh = Art.fort_module_mesh(_concrete(), masks, par)
++	mi.material_override = null
++	mi.set_surface_override_material(0, Art.mat_vc)
++	model.add_child(mi)
++	_slot_node = Node3D.new()
++	_slot_node.name = "RoofSlot1"
++	_slot_node.position = Vector3(0, levels * LEVEL_H + 0.25, 0)
++	model.add_child(_slot_node)
++	if state == BLUEPRINT:
++		Art.set_override(model, Art.mat_blueprint)
++		Art.set_shadows(model, false)
++	for g in mounted:
++		if g != null and is_instance_valid(g):
++			g.position = global_transform * _slot_node.position if is_inside_tree() else position + _slot_node.position
++
++func _refresh_area() -> void:
++	if not is_inside_tree() or state == DEAD:
++		return
++	_rebuild_visual()
++	for d in SIDES:
++		var n = neighbour(d)
++		if n != null and n != self:
++			n._rebuild_visual()
++
++func _on_built() -> void:
++	super._on_built()
++	_refresh_area()
++
++func _on_destroyed(effects: bool) -> void:
++	super._on_destroyed(effects)
++	for d in SIDES:
++		var n = neighbour(d)
++		if n != null:
++			n.call_deferred("_rebuild_visual")
++
++func tick(dt: float) -> void:
++	super.tick(dt)
++	if state == BUILT:
++		port_tick(dt)
++
++func _slot_marker(i: int) -> Node3D:
++	return _slot_node if i == 0 else null
++
++func slot_count() -> int:
++	return 1
++
++func slot_bonus() -> float:
++	return float(def.get("slot_bonus", 0.15)) * levels
++
++func capacity() -> int:
++	return levels
++
++func soldier_range() -> float:
++	return Defs.SOLDIER_RANGE + 3.0 + 1.5 * (levels - 1)
++
++func port_points() -> Array:
++	var out := []
++	for l in levels:
++		for i in 4:
++			var n = neighbour(SIDES[i])
++			if n != null and n.levels > l:
++				continue
++			var d: Vector2i = SIDES[i]
++			out.append(position + Vector3(d.x * 1.05, l * LEVEL_H + 1.5, d.y * 1.05))
++	if out.is_empty():
++		out.append(position + Vector3(0, levels * LEVEL_H + 1.2, 0))
++	return out
++
++func max_levels() -> int:
++	return int(def.get("max_levels", 4))
++
++func raise_cost() -> int:
++	return int(def.get("raise_cost", 40)) + 10 * (levels - 1)
++
++func can_raise() -> String:
++	if state != BUILT:
++		return "Finish it first"
++	if raising:
++		return "Already going up"
++	if levels >= max_levels():
++		return "As tall as it goes"
++	return ""
++
++func raise_one(pay: bool = true) -> String:
++	var why := can_raise()
++	if why != "":
++		return why
++	var c := raise_cost()
++	if pay and not G.main.spend(c):
++		return "A floor costs %d" % c
++	raising = true
++	raise_progress = 0.0
++	paid += c if pay else 0
++	G.workers.add_job(self)
++	return ""
++
++# Every module joined to this one that's the same height goes up a floor.
++func group() -> Array:
++	var seen := {self: true}
++	var open := [self]
++	var out := []
++	while not open.is_empty():
++		var m = open.pop_back()
++		out.append(m)
++		for d in SIDES:
++			var n = m.neighbour(d)
++			if n != null and not seen.has(n) and n.state == BUILT:
++				seen[n] = true
++				open.append(n)
++	return out
++
++func raise_group_list() -> Array:
++	return group().filter(func(m): return m.levels == levels and m.can_raise() == "")
++
++func raise_group() -> String:
++	var list := raise_group_list()
++	if list.is_empty():
++		return can_raise() if can_raise() != "" else "Nothing to raise"
++	var total := 0
++	for m in list:
++		total += m.raise_cost()
++	if not G.main.spend(total):
++		return "Raising %d modules costs %d" % [list.size(), total]
++	for m in list:
++		m.raise_one(false)
++		m.paid += m.raise_cost()
++	return ""
++
++func job_valid() -> bool:
++	return super.job_valid() or (raising and state == BUILT and is_inside_tree())
++
++func work(dt: float) -> bool:
++	if state == BLUEPRINT:
++		return super.work(dt)
++	if not raising:
++		return true
++	raise_progress += dt / maxf(0.5, float(def.get("raise_time", 6.0)))
++	if G.fx and randf() < dt * 1.5:
++		G.fx.dust(position + Vector3(0, levels * LEVEL_H, 0), 0.6)
++	if raise_progress >= 1.0:
++		finish_raise()
++		return true
++	return false
++
++func finish_raise() -> void:
++	raising = false
++	raise_progress = 0.0
++	levels += 1
++	var per := float(def.get("hp_per_level", def.get("hp", 700.0)))
++	var frac := hp / maxf(1.0, max_hp)
++	max_hp = per * levels
++	hp = minf(max_hp, max_hp * frac + per)
++	_pop = 1.0
++	if G.sfx:
++		G.sfx.play("build", position)
++	_refresh_area()
++	if G.buildings:
++		G.buildings.changed.emit()
++
++func card_lines() -> Array:
++	if state != BUILT:
++		return super.card_lines()
++	var joined := group().size()
++	var out := ["%d floor%s  ·  joined to %d module%s  ·  roof gun +%d%% range" % [levels, "" if levels == 1 else "s", joined - 1, "" if joined == 2 else "s", int(round(slot_bonus() * 100.0))]]
++	var s := "Soldiers at the slits %d/%d" % [occupants.size(), capacity()]
++	if not incoming.is_empty():
++		s += "  (+%d coming)" % incoming.size()
++	out.append(s)
++	if raising:
++		out.append("Raising a floor: %d%%" % int(raise_progress * 100.0))
++	return out
++
++func card_buttons() -> Array:
++	if state != BUILT:
++		return super.card_buttons()
++	var out := []
++	if can_raise() == "":
++		out.append(["raise", "+ FLOOR %d" % raise_cost(), G.main.supplies >= raise_cost()])
++		var list := raise_group_list()
++		if list.size() > 1:
++			var total := 0
++			for m in list:
++				total += m.raise_cost()
++			out.append(["raise_all", "RAISE ALL %d · %d" % [list.size(), total], G.main.supplies >= total])
++	for b in super.card_buttons():
++		out.append(b)
++	return out
 diff -ruN src_orig/scripts/buildings/garrison.gd src/scripts/buildings/garrison.gd
 --- a/scripts/buildings/garrison.gd	2026-10-24 19:02:37.755210274 +0000
 +++ b/scripts/buildings/garrison.gd	2026-10-25 01:26:55.135113369 +0000
@@ -625,7 +937,7 @@ diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 +	_plan_refuge()
 diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
-+++ b/scripts/defs.gd	2026-10-25 01:26:55.134172893 +0000
++++ b/scripts/defs.gd	2026-10-25 06:29:50.932543403 +0000
 @@ -24,7 +24,7 @@
  const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
  const START_CRATES := 6
@@ -635,7 +947,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const CRAFT_TIME := 8.0
  const CRAFTERS_PER_WORKSHOP := 2
  const FETCH_LOAD := 25
-@@ -224,18 +224,105 @@
+@@ -224,18 +224,117 @@
  		"ground": true, "trench": false, "line": true, "model": "",
  		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
  	},
@@ -668,6 +980,18 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 +		"name": "Clinic", "long": "Clinic", "cost": 130, "time": 20.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
 +		"prefab": true, "half": Vector2(2.0, 1.5), "model": "clinic", "unlock": 3, "heal": 5.0, "heal_range": 14.0,
 +		"hint": "Drag it, turn the handle, then tick", "about": "Heals everyone within 14 m",
++	},
++	"fort_wood": {
++		"name": "Wood Fort", "long": "Wooden Fort Module", "cost": 25, "time": 4.0, "hp": 700.0, "hp_per_level": 700.0,
++		"raise_cost": 30, "raise_time": 6.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true,
++		"ground": true, "trench": false, "line": true, "model": "fort_wood", "slot_bonus": 0.15,
++		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
++	},
++	"fort_concrete": {
++		"name": "Concrete", "long": "Concrete Fort Module", "cost": 45, "time": 7.0, "hp": 1600.0, "hp_per_level": 1600.0,
++		"raise_cost": 55, "raise_time": 10.0, "max_levels": 4, "blocks": true, "zcost": 6.0, "hide_inside": true, "unlock": 3,
++		"ground": true, "trench": false, "line": true, "model": "fort_concrete", "slot_bonus": 0.15,
++		"hint": "Drag to lay a row. Tap one to add floors", "about": "Joins its neighbours  ·  up to 4 floors  ·  gun on the roof",
 +	},
 +	"water_tower": {
 +		"name": "Water Tw", "long": "Water Tower", "cost": 200, "time": 22.0, "hp": 2200.0, "blocks": true, "zcost": 6.0,
@@ -734,7 +1058,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 -	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "remove"]},
 +	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
 +	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
-+	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
++	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 +	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 +	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
  ]
@@ -743,11 +1067,11 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 -	"ammo_point", "radio", "fuel", "spikes", "mine", "dig"]
 +	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
 +	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
-+	"water_tower", "container", "pillbox", "armory", "scrapyard"]
++	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete"]
  const MAP_BUILDINGS := {
  	"house_two_storey": {
  		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
-@@ -268,7 +355,8 @@
+@@ -268,7 +367,8 @@
  	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
  	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
  ]
@@ -757,7 +1081,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
  const SOLDIER_MAX := 40
  const SOLDIER_HP := 70.0
-@@ -301,6 +389,7 @@
+@@ -301,6 +401,7 @@
  const Z_RUNNER := 1
  const Z_BRUTE := 2
  const REFUND_BUILT := 0.5
@@ -963,7 +1287,7 @@ diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
  		s.refresh()
 diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-25 01:01:08.801182221 +0000
++++ b/scripts/main.gd	2026-10-25 06:30:01.063460040 +0000
 @@ -26,6 +26,14 @@
  var phase := "title"
  var phase_t := 0.0
@@ -1032,7 +1356,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  			if phase_t <= 0.0 and not test_mode:
  				start_wave()
  		"wave":
-@@ -1164,6 +1188,20 @@
+@@ -1164,6 +1188,24 @@
  			quality.next_mode()
  			_ui("ui_tap")
  			hud.toast("Graphics: %s" % quality.label())
@@ -1046,6 +1370,10 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 +			_save_game_settings()
 +			_ui("ui_tap")
 +			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
++		"raise":
++			_card_result(target.raise_one(), "Workers will add a floor")
++		"raise_all":
++			_card_result(target.raise_group(), "Workers will raise the fort")
 +		"fps":
 +			quality.next_fps()
 +			_ui("ui_tap")
@@ -1053,7 +1381,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _card_result(why: String, ok_text: String) -> void:
  	if why != "":
-@@ -1191,7 +1229,7 @@
+@@ -1191,7 +1233,7 @@
  		_ui("zone_breached")
  		cam.shake(0.4)
  	elif secured:
@@ -1062,7 +1390,18 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _on_tool_changed(t: String) -> void:
  	var h := ""
-@@ -1230,14 +1268,40 @@
+@@ -1211,7 +1253,9 @@
+ 			h = "Tap ground or a glowing slot, then tick"
+ 		elif t == "wall" or t == "concrete":
+ 			h = "Tap points. Drag to look. Tick to build"
+-		elif t == "wire" or t == "dig":
++		elif t.begins_with("fort_"):
++			h = "Tap the start, tap the end, then tick. Tap a module for floors"
++		elif bool(Defs.BUILD[t].get("line", false)):
+ 			h = "Tap the start, tap the end, then tick"
+ 		elif not Defs.is_prefab(t):
+ 			h = "Tap to place, then tick"
+@@ -1230,14 +1274,40 @@
  	get_tree().reload_current_scene()
  
  func wave_size(w: int) -> int:
@@ -1107,7 +1446,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _plan_edges() -> void:
  	var n := 1
-@@ -1267,6 +1331,7 @@
+@@ -1267,6 +1337,7 @@
  func start_wave() -> void:
  	if phase != "build":
  		return
@@ -1115,7 +1454,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	phase = "wave"
  	zombies.wave = wave
  	_wave_t = 0.0
-@@ -1276,7 +1341,7 @@
+@@ -1276,7 +1347,7 @@
  	var runner_frac := 0.0
  	if wave >= 3:
  		runner_frac = minf(0.3, 0.1 + 0.025 * (wave - 3))
@@ -1124,7 +1463,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	for i in count - brutes:
  		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)
  	_queue.shuffle()
-@@ -1303,14 +1368,15 @@
+@@ -1303,14 +1374,15 @@
  
  func _spawn_step(dt: float) -> void:
  	_spawn_t -= dt
@@ -1142,7 +1481,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  				break
  			var kind: int = _queue.pop_back()
  			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
-@@ -1345,8 +1411,18 @@
+@@ -1345,8 +1417,18 @@
  func _wave_cleared() -> void:
  	waves_cleared = wave
  	var bonus := wave_bonus()
@@ -1163,7 +1502,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	_ui("wave_cleared")
  	logi.on_wave_cleared()
  	wave_cleared.emit(wave)
-@@ -1354,14 +1430,47 @@
+@@ -1354,14 +1436,47 @@
  	phase = "build"
  	phase_t = Defs.BUILD_PHASE_TIME
  	_plan_edges()
@@ -1707,8 +2046,8 @@ diff -ruN src_orig/scripts/quality.gd src/scripts/quality.gd
  	cf.save(SETTINGS_PATH)
 diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
 --- a/scripts/save_game.gd	1970-01-01 00:00:00.000000000 +0000
-+++ b/scripts/save_game.gd	2026-10-25 00:04:40.327006716 +0000
-@@ -0,0 +1,340 @@
++++ b/scripts/save_game.gd	2026-10-25 06:29:50.972651796 +0000
+@@ -0,0 +1,347 @@
 +class_name SaveGame
 +extends RefCounted
 +# Autosave and continue. The game is saved between waves (when a wave is
@@ -1836,6 +2175,10 @@ diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
 +		else:
 +			e2["type"] = "ground"
 +			e2["cell"] = b.cell
++			if b is FortModule:
++				e2["levels"] = b.levels
++				if b.raising:
++					refund += b.raise_cost()
 +		ids[b] = "b%d" % things.size()
 +		things.append(e2)
 +	d["things"] = things
@@ -1992,6 +2335,9 @@ diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
 +				b = G.buildings.last_placed
 +			if b != null and b.is_gun():
 +				b.set_rest(float(e.get("rest", 0.0)))
++			if b is FortModule and built:
++				for i in int(e.get("levels", 1)) - 1:
++					b.finish_raise()
 +		"rect":
 +			var p := _v3(e["pos"])
 +			var yaw := float(e.get("yaw", 0.0))
@@ -2216,13 +2562,14 @@ diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
  	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
 diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
-+++ b/scripts/ui/icons.gd	2026-10-25 01:16:18.237998690 +0000
-@@ -1,7 +1,12 @@
++++ b/scripts/ui/icons.gd	2026-10-25 06:29:50.972016115 +0000
+@@ -1,7 +1,13 @@
  class_name Icons
  extends RefCounted
  
 +const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
 +	"clinic": "heart", "water_tower": "watchtower", "container": "depot", "pillbox": "garrison", "armory": "soldier", "scrapyard": "supplies",
++	"fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
 +	"lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
 +
  static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:
@@ -2230,7 +2577,7 @@ diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
  	var c := r.get_center()
  	var s := minf(r.size.x, r.size.y)
  	match kind:
-@@ -334,7 +339,9 @@
+@@ -334,7 +340,9 @@
  			return "hammer"
  		"expand":
  			return "expand"

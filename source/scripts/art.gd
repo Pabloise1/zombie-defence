@@ -743,6 +743,9 @@ func _placeholder(kind: String) -> Node3D:
 		"clinic":
 			_mi(_cached("clinic", _mesh_clinic), mat_vc, root, "Body")
 			_marker(root, "Door", Vector3(0, 0, 1.9))
+		"fort_wood", "fort_concrete":
+			_mi(fort_module_mesh(kind == "fort_concrete", [0], 15), mat_vc, root, "Body")
+			_marker(root, "RoofSlot1", Vector3(0, 3.25, 0))
 		"water_tower":
 			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
 			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
@@ -932,6 +935,49 @@ func _mesh_clinic() -> ArrayMesh:
 		k.box(Vector3(0.7, 0.6, 0.05), Vector3(x, 1.7, 1.42), Color(0.45, 0.6, 0.65))
 	k.box(Vector3(1.6, 0.08, 0.9), Vector3(0, 2.25, 1.85), white)
 	return k.build()
+
+# One 2 m fort module. masks[l] says which sides (N, E, S, W bits) join a
+# neighbour on floor l, so no wall is drawn there; par says which roof edges
+# get a sandbag parapet.
+func fort_module_mesh(concrete: bool, masks: Array, par: int) -> ArrayMesh:
+	var key := "fort_%s_%s_%d" % ["c" if concrete else "w", str(masks), par]
+	if _meshes.has(key):
+		return _meshes[key]
+	var k := MeshKit.new()
+	var wall := C_CONCRETE if concrete else C_WOOD
+	var trim := C_CONCRETE_DK if concrete else C_WOOD_DK
+	var lh := 3.0
+	var dirs := [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
+	k.box(Vector3(2.0, 0.2, 2.0), Vector3(0, 0.1, 0), trim)
+	for l in masks.size():
+		var y0 := l * lh
+		var m: int = masks[l]
+		for cx in [-0.86, 0.86]:
+			for cz in [-0.86, 0.86]:
+				k.box(Vector3(0.28, lh, 0.28), Vector3(cx, y0 + lh * 0.5, cz), trim)
+		for i in 4:
+			if m & (1 << i):
+				continue
+			var d: Vector3 = dirs[i]
+			var rot := Vector3(0, PI * 0.5, 0) if d.x != 0.0 else Vector3.ZERO
+			var o := d * 0.86
+			k.box(Vector3(1.72, 1.25, 0.26), o + Vector3(0, y0 + 0.75, 0), wall, rot)
+			k.box(Vector3(1.72, 1.15, 0.26), o + Vector3(0, y0 + 2.42, 0), wall, rot)
+			k.box(Vector3(0.5, 0.45, 0.26), o + Vector3(0, y0 + 1.6, 0), wall, rot)
+			k.box(Vector3(1.8, 0.1, 0.34), o + Vector3(0, y0 + 1.36, 0) + d * 0.04, trim, rot)
+		k.box(Vector3(2.0, 0.22, 2.0), Vector3(0, y0 + lh + 0.01, 0), trim)
+	var top := masks.size() * lh + 0.12
+	for i in 4:
+		if not (par & (1 << i)):
+			continue
+		var d2: Vector3 = dirs[i]
+		var rot2 := Vector3(0, PI * 0.5, 0) if d2.x != 0.0 else Vector3.ZERO
+		for j in 3:
+			var along := Vector3(-d2.z, 0, d2.x) * (-0.62 + j * 0.62)
+			k.box(Vector3(0.6, 0.32, 0.36), d2 * 0.82 + along + Vector3(0, top + 0.16, 0), C_FABRIC if not concrete else C_SAND, rot2)
+	var mesh := k.build()
+	_meshes[key] = mesh
+	return mesh
 
 func _mesh_water_tower() -> ArrayMesh:
 	var k := MeshKit.new()

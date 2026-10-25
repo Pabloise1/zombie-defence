@@ -125,6 +125,10 @@ static func capture(m) -> Dictionary:
 		else:
 			e2["type"] = "ground"
 			e2["cell"] = b.cell
+			if b is FortModule:
+				e2["levels"] = b.levels
+				if b.raising:
+					refund += b.raise_cost()
 		ids[b] = "b%d" % things.size()
 		things.append(e2)
 	d["things"] = things
@@ -281,6 +285,9 @@ static func _restore_thing(m, e: Dictionary):
 				b = G.buildings.last_placed
 			if b != null and b.is_gun():
 				b.set_rest(float(e.get("rest", 0.0)))
+			if b is FortModule and built:
+				for i in int(e.get("levels", 1)) - 1:
+					b.finish_raise()
 		"rect":
 			var p := _v3(e["pos"])
 			var yaw := float(e.get("yaw", 0.0))

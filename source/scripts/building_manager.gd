@@ -29,6 +29,8 @@ func _make(kind: String) -> Building:
 			return StairsTower.new()
 		"helipad", "helipad_large":
 			return Helipad.new()
+		"fort_wood", "fort_concrete":
+			return FortModule.new()
 	if Defs.is_prefab(kind):
 		return PrefabBuilding.new()
 	match kind:
