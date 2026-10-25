@@ -3,6 +3,7 @@ extends CanvasLayer
 signal tool_pressed(tool: String)
 signal start_wave_pressed
 signal play_pressed
+signal continue_pressed
 signal restart_pressed
 signal card_action(id: String, target)
 signal plan_done
@@ -328,7 +329,7 @@ func _layout() -> void:
 	banner.size = Vector2(minf(560.0, vs.x - 20.0), 110.0)
 	banner.position = Vector2(vs.x * 0.5 - banner.size.x * 0.5, vs.y * (0.24 if portrait else 0.26) - 30.0)
 	var tcw := minf(460.0, vs.x - 32.0)
-	title_card.size = Vector2(tcw, 440.0)
+	title_card.size = Vector2(tcw, 440.0 + (70.0 if not save_info.is_empty() else 0.0))
 	title_card.position = (vs - title_card.size) * 0.5
 	over_card.size = Vector2(tcw, 230.0)
 	over_card.position = (vs - over_card.size) * 0.5
@@ -867,8 +868,19 @@ func _paint_banner(ci: CanvasItem, r: Rect2) -> void:
 		text(ci, Vector2(sr.position.x, sr.position.y + 20.0), sub, 15, TEXT, font_bold, HORIZONTAL_ALIGNMENT_CENTER, sr.size.x)
 var _map_rects := {}
 var _play_rect := Rect2()
+var _continue_rect := Rect2()
+# {wave, map, people} of the save to continue, or empty.
+var save_info: Dictionary = {}:
+	set(v):
+		save_info = v
+		if title_card:
+			_layout()
+			title_card.queue_redraw()
 
 func _title_press(p: Vector2) -> void:
+	if not save_info.is_empty() and _continue_rect.has_point(p):
+		continue_pressed.emit()
+		return
 	if _play_rect.has_point(p):
 		play_pressed.emit()
 		return
@@ -912,9 +924,27 @@ func _paint_title(ci: CanvasItem, r: Rect2) -> void:
 	var br := Rect2(r.position.x + r.size.x * 0.5 - 100, r.end.y - 78, 200, 56)
 	_play_rect = br
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = ACCENT
 	sb.set_corner_radius_all(18)
 	sb.anti_aliasing = true
+	if not save_info.is_empty():
+		var cr2 := Rect2(r.position.x + 16, r.end.y - 148, r.size.x - 32, 60)
+		_continue_rect = cr2
+		sb.bg_color = ACCENT
+		ci.draw_style_box(sb, cr2)
+		Icons.draw(ci, "play", Rect2(cr2.position.x + 22, cr2.position.y + 19, 22, 22), ACCENT_DK)
+		var map_name := String(save_info.get("map", "")).capitalize()
+		text(ci, Vector2(cr2.position.x + 30, cr2.position.y + 28), "CONTINUE", 21, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, cr2.size.x - 30)
+		text(ci, Vector2(cr2.position.x + 30, cr2.position.y + 48), "Wave %d  ·  %s  ·  %d people" % [int(save_info["wave"]), map_name, int(save_info.get("people", 0))], 13, ACCENT_DK, font_bold, HORIZONTAL_ALIGNMENT_CENTER, cr2.size.x - 30)
+		var sb3 := StyleBoxFlat.new()
+		sb3.set_corner_radius_all(18)
+		sb3.anti_aliasing = true
+		sb3.bg_color = Color(1, 1, 1, 0.06)
+		sb3.border_color = Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.7)
+		sb3.set_border_width_all(2)
+		ci.draw_style_box(sb3, br)
+		text(ci, Vector2(br.position.x, br.position.y + 35), "NEW GAME", 19, ACCENT, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
+		return
+	sb.bg_color = ACCENT
 	ci.draw_style_box(sb, br)
 	Icons.draw(ci, "play", Rect2(br.position.x + 40, br.position.y + 17, 22, 22), ACCENT_DK)
 	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)

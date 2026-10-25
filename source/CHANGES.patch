@@ -1,4 +1,4 @@
-diff -ru src_orig/scripts/building.gd src/scripts/building.gd
+diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
 --- a/scripts/building.gd	2026-10-24 19:02:37.754757495 +0000
 +++ b/scripts/building.gd	2026-10-24 19:11:47.959085698 +0000
 @@ -22,6 +22,8 @@
@@ -131,7 +131,7 @@ diff -ru src_orig/scripts/building.gd src/scripts/building.gd
  func is_wallish() -> bool:
  	return rect
  
-diff -ru src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
+diff -ruN src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
 --- a/scripts/buildings/hq.gd	2026-10-24 19:02:37.755353206 +0000
 +++ b/scripts/buildings/hq.gd	2026-10-24 20:04:23.514861008 +0000
 @@ -56,7 +56,7 @@
@@ -143,7 +143,7 @@ diff -ru src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
  			"crafter":
  				note = "Make ammo at a workshop" if G.buildings.count_built("workshop") > 0 else "Needs a workshop"
  		var can_plus := idle > 0
-diff -ru src_orig/scripts/buildings/room_block.gd src/scripts/buildings/room_block.gd
+diff -ruN src_orig/scripts/buildings/room_block.gd src/scripts/buildings/room_block.gd
 --- a/scripts/buildings/room_block.gd	2026-10-24 19:02:37.755129078 +0000
 +++ b/scripts/buildings/room_block.gd	2026-10-24 20:05:24.250685814 +0000
 @@ -1,9 +1,23 @@
@@ -264,7 +264,7 @@ diff -ru src_orig/scripts/buildings/room_block.gd src/scripts/buildings/room_blo
  	if floor_job != null and is_instance_valid(floor_job):
  		out.append("Building storey %d: %d%%" % [storeys + 1, int(floor_job.progress * 100.0)])
  	return out
-diff -ru src_orig/scripts/civilian.gd src/scripts/civilian.gd
+diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 --- a/scripts/civilian.gd	2026-10-24 19:02:37.755483804 +0000
 +++ b/scripts/civilian.gd	2026-10-24 20:03:49.628893333 +0000
 @@ -1,6 +1,6 @@
@@ -350,7 +350,7 @@ diff -ru src_orig/scripts/civilian.gd src/scripts/civilian.gd
 +	_houses = false
 +	waiting = false
 +	_plan_refuge()
-diff -ru src_orig/scripts/defs.gd src/scripts/defs.gd
+diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
 +++ b/scripts/defs.gd	2026-10-24 19:14:31.154073723 +0000
 @@ -24,7 +24,7 @@
@@ -370,7 +370,7 @@ diff -ru src_orig/scripts/defs.gd src/scripts/defs.gd
  const Z_HP_GROWTH := 0.38
  const Z_HP_LATE := 0.05
  const Z_HP := [33.0, 23.0, 330.0]
-diff -ru src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
+diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
 --- a/scripts/fetcher.gd	2026-10-24 19:02:37.756064080 +0000
 +++ b/scripts/fetcher.gd	2026-10-24 20:04:23.514436284 +0000
 @@ -1,6 +1,6 @@
@@ -486,7 +486,19 @@ diff -ru src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
  		anim_mode = "run"
  	else:
  		anim_mode = "idle"
-diff -ru src_orig/scripts/logistics.gd src/scripts/logistics.gd
+diff -ruN src_orig/scripts/g.gd src/scripts/g.gd
+--- a/scripts/g.gd	2026-10-24 19:02:37.755977835 +0000
++++ b/scripts/g.gd	2026-10-25 00:05:32.200787540 +0000
+@@ -22,6 +22,8 @@
+ var helis = null
+ var rng := RandomNumberGenerator.new()
+ var sim_time := 0.0
++# A save to continue from on the next scene load (survives reset()).
++var resume: Dictionary = {}
+ 
+ func reset() -> void:
+ 	main = null
+diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
 --- a/scripts/logistics.gd	2026-10-24 19:02:37.755636605 +0000
 +++ b/scripts/logistics.gd	2026-10-24 19:07:05.109941219 +0000
 @@ -4,6 +4,7 @@
@@ -524,18 +536,72 @@ diff -ru src_orig/scripts/logistics.gd src/scripts/logistics.gd
  func nearest_with_crates(p: Vector3, exclude = null):
  	var best = null
  	var bd := INF
-diff -ru src_orig/scripts/main.gd src/scripts/main.gd
+diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-24 20:04:39.078278265 +0000
-@@ -26,6 +26,7 @@
++++ b/scripts/main.gd	2026-10-25 00:05:32.201768615 +0000
+@@ -26,6 +26,9 @@
  var phase := "title"
  var phase_t := 0.0
  var waves_cleared := 0
 +var repair_spent := 0
++var map_seed := 0
++var _save_t := 0.0
  var test_mode := false
  var manual_clock := false
  var _queue: Array = []
-@@ -1164,6 +1165,10 @@
+@@ -51,6 +54,8 @@
+ func _ready() -> void:
+ 	G.reset()
+ 	G.main = self
++	if not G.resume.is_empty():
++		G.map_id = String(G.resume["map"])
+ 	for a in OS.get_cmdline_user_args():
+ 		if a.begins_with("--map="):
+ 			G.map_id = a.substr(6)
+@@ -70,6 +75,11 @@
+ 		hud.show_title(true)
+ 		cam.focus(Defs.hq_center() + Vector3(0, 0, 6), 46.0)
+ 		cam.snap()
++	if not G.resume.is_empty() and not test_mode:
++		var d: Dictionary = G.resume
++		G.resume = {}
++		_continue(d)
++	hud.save_info = SaveGame.summary() if not test_mode else {}
+ 	var args := OS.get_cmdline_user_args()
+ 	for a in args:
+ 		_dev_arg(a)
+@@ -768,7 +778,10 @@
+ 		mb.name = "Map"
+ 		add_child(mb)
+ 		G.map = mb
+-		mb.build(SuburbLayout.data(), G.rng.randi())
++		map_seed = G.rng.randi()
++		if not G.resume.is_empty():
++			map_seed = int(G.resume.get("seed", map_seed))
++		mb.build(SuburbLayout.data(), map_seed)
+ 		people.ruins = mb.survivor_points()
+ 	cam = CameraRig.new()
+ 	cam.name = "Camera"
+@@ -790,6 +803,7 @@
+ 	hud.tool_pressed.connect(_on_tool_pressed)
+ 	hud.start_wave_pressed.connect(start_wave)
+ 	hud.play_pressed.connect(_on_play)
++	hud.continue_pressed.connect(_on_continue)
+ 	hud.restart_pressed.connect(_on_restart)
+ 	hud.card_action.connect(_on_card_action)
+ 	builder.tool_changed.connect(_on_tool_changed)
+@@ -935,6 +949,10 @@
+ 	match phase:
+ 		"build":
+ 			phase_t -= dt
++			_save_t -= dt
++			if _save_t <= 0.0:
++				_save_t = 20.0
++				autosave()
+ 			if phase_t <= 0.0 and not test_mode:
+ 				start_wave()
+ 		"wave":
+@@ -1164,6 +1182,10 @@
  			quality.next_mode()
  			_ui("ui_tap")
  			hud.toast("Graphics: %s" % quality.label())
@@ -546,7 +612,7 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  
  func _card_result(why: String, ok_text: String) -> void:
  	if why != "":
-@@ -1191,7 +1196,7 @@
+@@ -1191,7 +1213,7 @@
  		_ui("zone_breached")
  		cam.shake(0.4)
  	elif secured:
@@ -555,7 +621,15 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  
  func _on_tool_changed(t: String) -> void:
  	var h := ""
-@@ -1303,14 +1308,15 @@
+@@ -1267,6 +1289,7 @@
+ func start_wave() -> void:
+ 	if phase != "build":
+ 		return
++	autosave()
+ 	phase = "wave"
+ 	zombies.wave = wave
+ 	_wave_t = 0.0
+@@ -1303,14 +1326,15 @@
  
  func _spawn_step(dt: float) -> void:
  	_spawn_t -= dt
@@ -573,7 +647,7 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  				break
  			var kind: int = _queue.pop_back()
  			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
-@@ -1346,7 +1352,12 @@
+@@ -1346,7 +1370,12 @@
  	waves_cleared = wave
  	var bonus := wave_bonus()
  	add_supplies(bonus)
@@ -587,7 +661,7 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  	_ui("wave_cleared")
  	logi.on_wave_cleared()
  	wave_cleared.emit(wave)
-@@ -1354,6 +1365,8 @@
+@@ -1354,14 +1383,47 @@
  	phase = "build"
  	phase_t = Defs.BUILD_PHASE_TIME
  	_plan_edges()
@@ -596,10 +670,67 @@ diff -ru src_orig/scripts/main.gd src/scripts/main.gd
  	for t in Defs.TOOLS:
  		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
  			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
-diff -ru src_orig/scripts/maps/map_building.gd src/scripts/maps/map_building.gd
++	_save_t = 20.0
++	autosave()
++
++func autosave() -> void:
++	if test_mode or manual_clock or phase == "title" or phase == "over":
++		return
++	SaveGame.write(self)
++
++func _on_continue() -> void:
++	var d := SaveGame.read()
++	if d.is_empty():
++		hud.toast("That save can't be loaded")
++		_ui("ui_invalid")
++		return
++	_ui("ui_confirm")
++	G.resume = d
++	get_tree().reload_current_scene()
++
++func _continue(d: Dictionary) -> void:
++	hud.show_title(false)
++	if not SaveGame.restore(self, d):
++		hud.show_title(true)
++		return
++	phase = "build"
++	phase_t = maxf(float(d.get("phase_t", 0.0)), 30.0)
++	_save_t = 20.0
++	_plan_edges()
++	cam.focus(Defs.hq_center() + Vector3(0, 0, 4), 38.0)
++	cam.snap()
++	hud.show_banner("WELCOME BACK", "Wave %d comes from the %s" % [wave, _edge_text()])
+ 
+ func on_hq_destroyed() -> void:
+ 	if phase == "over":
+ 		return
+ 	phase = "over"
++	SaveGame.clear()
+ 	builder.set_tool("")
+ 	builder.select(null)
+ 	_queue.clear()
+diff -ruN src_orig/scripts/maps/map_building.gd src/scripts/maps/map_building.gd
 --- a/scripts/maps/map_building.gd	2026-10-24 19:02:37.756348142 +0000
-+++ b/scripts/maps/map_building.gd	2026-10-24 20:04:31.766090598 +0000
-@@ -194,6 +194,7 @@
++++ b/scripts/maps/map_building.gd	2026-10-25 00:05:32.200441775 +0000
+@@ -104,7 +104,7 @@
+ 		return true
+ 	return false
+ 
+-func _claimed() -> void:
++func _claimed(quiet: bool = false) -> void:
+ 	claiming = false
+ 	claimed = true
+ 	progress = 1.0
+@@ -116,6 +116,8 @@
+ 	G.buildings.list.append(self)
+ 	G.buildings.refresh_zones()
+ 	G.grid.notify_paths_changed()
++	if quiet:
++		return
+ 	_pop = 1.0
+ 	if G.fx:
+ 		G.fx.dust(position + Vector3(0, 0.4, 0), 2.0)
+@@ -194,6 +196,7 @@
  			out.append("Being secured  %d%%" % int(progress * 100.0))
  		else:
  			out.append("Not yours. Claim it: workers secure it (~%ds)" % int(def.get("claim_time", 18.0)))
@@ -607,7 +738,7 @@ diff -ru src_orig/scripts/maps/map_building.gd src/scripts/maps/map_building.gd
  			out.append("Might hide survivors or supplies")
  		if kind == "petrol_station" and not exploded:
  			out.append("Pumps: a shell or blast there sets them off. Big explosion")
-@@ -201,6 +202,8 @@
+@@ -201,6 +204,8 @@
  			out.append("Burnt out")
  		return out
  	out = super.card_lines()
@@ -616,7 +747,7 @@ diff -ru src_orig/scripts/maps/map_building.gd src/scripts/maps/map_building.gd
  	if kind == "petrol_station" and not exploded:
  		out.append("Careful: hits on the pumps blow it up")
  	return out
-diff -ru src_orig/scripts/people_manager.gd src/scripts/people_manager.gd
+diff -ruN src_orig/scripts/people_manager.gd src/scripts/people_manager.gd
 --- a/scripts/people_manager.gd	2026-10-24 19:02:37.755436549 +0000
 +++ b/scripts/people_manager.gd	2026-10-24 20:34:02.755230884 +0000
 @@ -18,6 +18,10 @@
@@ -856,7 +987,7 @@ diff -ru src_orig/scripts/people_manager.gd src/scripts/people_manager.gd
  		_straggle_t -= dt
  		if _straggle_t <= 0.0:
  			var r2: Vector3 = ruins[randi() % ruins.size()]
-diff -ru src_orig/scripts/quality.gd src/scripts/quality.gd
+diff -ruN src_orig/scripts/quality.gd src/scripts/quality.gd
 --- a/scripts/quality.gd	2026-10-24 19:02:37.756425757 +0000
 +++ b/scripts/quality.gd	2026-10-24 19:27:03.401648103 +0000
 @@ -6,51 +6,128 @@
@@ -1072,7 +1203,351 @@ diff -ru src_orig/scripts/quality.gd src/scripts/quality.gd
  	cf.set_value("graphics", "quality", mode)
 +	cf.set_value("graphics", "fps", fps_cap)
  	cf.save(SETTINGS_PATH)
-diff -ru src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
+diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
+--- a/scripts/save_game.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/save_game.gd	2026-10-25 00:04:40.327006716 +0000
+@@ -0,0 +1,340 @@
++class_name SaveGame
++extends RefCounted
++# Autosave and continue. The game is saved between waves (when a wave is
++# cleared, when the next one starts, and every so often while building), so
++# a reload or crash puts you back at the start of the wave you were on.
++# Everything is rebuilt through the normal placement code, in dependency
++# order: map claims, trenches, walls, buildings, mounted guns, people, posts.
++const PATH := "user://save.dat"
++const TMP := "user://save.tmp"
++const VERSION := 1
++
++static func exists() -> bool:
++	return FileAccess.file_exists(PATH)
++
++static func read() -> Dictionary:
++	if not exists():
++		return {}
++	var f := FileAccess.open(PATH, FileAccess.READ)
++	if f == null:
++		return {}
++	var d = f.get_var()
++	if not (d is Dictionary) or int(d.get("version", 0)) != VERSION:
++		return {}
++	return d
++
++static func summary() -> Dictionary:
++	var d := read()
++	if d.is_empty():
++		return {}
++	return {"wave": int(d["wave"]), "map": String(d["map"]), "people": int(d.get("people_total", 0))}
++
++static func clear() -> void:
++	if exists():
++		DirAccess.remove_absolute(PATH)
++
++static func write(m) -> void:
++	var d := capture(m)
++	var f := FileAccess.open(TMP, FileAccess.WRITE)
++	if f == null:
++		return
++	f.store_var(d)
++	f.close()
++	DirAccess.rename_absolute(TMP, PATH)
++
++static func _common(b) -> Dictionary:
++	var d := {"kind": b.kind, "state": b.state, "hp": b.hp, "progress": b.progress, "paid": b.paid,
++		"mag": b.mag, "reserve": b.reserve, "rest": b.rest_yaw}
++	if "crates" in b:
++		d["crates"] = b.crates
++	return d
++
++static func _in_flux(b) -> bool:
++	# Half-done wall upgrades and moves can't be rebuilt exactly: drop them
++	# and give their supplies back instead.
++	return b.state == Building.BLUEPRINT and (b.edit_group != null or b.move_from != null)
++
++static func capture(m) -> Dictionary:
++	var refund := 0
++	var d := {"version": VERSION, "map": G.map_id, "seed": m.map_seed, "wave": m.wave, "waves_cleared": m.waves_cleared,
++		"phase_t": m.phase_t if m.phase == "build" else 0.0, "kills": G.zombies.kills, "repair_spent": m.repair_spent,
++		"hq_hp": G.buildings.hq.hp, "hq_crates": G.logi.hq_crates, "auto_rebuild": G.walls.auto_rebuild}
++	var scrap := []
++	for s in G.logi.salvage:
++		scrap.append(s.scrap)
++	d["scrap"] = scrap
++	var claims := []
++	var fences := []
++	if G.map:
++		for i in G.map.buildings.size():
++			var mb = G.map.buildings[i]
++			if is_instance_valid(mb) and (mb.claimed or mb.exploded or mb.state == Building.DEAD):
++				claims.append({"i": i, "claimed": mb.claimed, "hp": mb.hp, "dead": mb.state == Building.DEAD, "exploded": mb.exploded})
++		for i in G.map.fences.size():
++			if G.map.fences[i].claimed:
++				fences.append(i)
++	d["claims"] = claims
++	d["fences"] = fences
++	var trench := []
++	for i in G.grid.terrain.size():
++		if G.grid.terrain[i] == Defs.T_TRENCH:
++			trench.append(i)
++	d["trench"] = trench
++	var segs := []
++	for s in G.walls.segments:
++		if not is_instance_valid(s) or s.state == Building.DEAD:
++			continue
++		if _in_flux(s):
++			refund += s.paid
++			continue
++		var e := _common(s)
++		e["a"] = s.a
++		e["b"] = s.b
++		e["ported"] = s.ported
++		e["heavy"] = s.heavy
++		segs.append(e)
++	d["segs"] = segs
++	var ids := {}
++	var things := []
++	for b in G.buildings.list:
++		if not is_instance_valid(b) or b.state == Building.DEAD or b == G.buildings.hq:
++			continue
++		if b is LinearStructure or b is MapBuilding or b.host != null:
++			continue
++		if _in_flux(b) or (b.moving_to != null and b.state == Building.BLUEPRINT):
++			refund += b.paid
++			continue
++		var e2 := _common(b)
++		if b is WallNest:
++			e2["type"] = "nest"
++			e2["pos"] = b.position
++			e2["dir"] = b.line_dir
++			e2["wall"] = b.wall_kind
++		elif b is RoofBridge:
++			e2["type"] = "bridge"
++			e2["pa"] = b.pa
++			e2["pb"] = b.pb
++		elif b.rect:
++			e2["type"] = "rect"
++			e2["pos"] = b.position
++			e2["yaw"] = b.yaw
++			if b is RoomBlock:
++				e2["storeys"] = b.storeys
++			if b is Helipad and b.heli != null and is_instance_valid(b.heli):
++				e2["heli"] = b.heli.kind
++		else:
++			e2["type"] = "ground"
++			e2["cell"] = b.cell
++		ids[b] = "b%d" % things.size()
++		things.append(e2)
++	d["things"] = things
++	if G.map:
++		for i in G.map.buildings.size():
++			ids[G.map.buildings[i]] = "m%d" % i
++	var guns := []
++	var crews := []
++	for b in G.buildings.list:
++		if not is_instance_valid(b) or b.state == Building.DEAD:
++			continue
++		if b.host != null and ids.has(b.host):
++			if _in_flux(b):
++				refund += b.paid
++				continue
++			var e3 := _common(b)
++			e3["host"] = ids[b.host]
++			e3["slot"] = b.slot_i
++			guns.append(e3)
++		if ids.has(b) and not b.occupants.is_empty():
++			crews.append({"host": ids[b], "n": b.occupants.filter(func(o): return o is Soldier).size()})
++	d["guns"] = guns
++	d["crews"] = crews
++	var jobs := {}
++	for j in Defs.JOBS:
++		jobs[j] = G.people.count_job(j)
++	d["jobs"] = jobs
++	d["idle"] = G.people.owned_civilians().size()
++	d["people_total"] = G.people.population()
++	d["supplies"] = m.supplies + refund
++	return d
++
++static func _v3(v) -> Vector3:
++	return v if v is Vector3 else Vector3.ZERO
++
++static func _apply_common(b, e: Dictionary) -> void:
++	if b == null:
++		return
++	b.paid = int(e.get("paid", 0))
++	if b.state == Building.BLUEPRINT:
++		b.progress = float(e.get("progress", 0.0))
++	else:
++		b.hp = clampf(float(e.get("hp", b.max_hp)), 1.0, b.max_hp)
++		if b.has_method("damage_look"):
++			b.damage_look()
++	if b.mag_size > 0:
++		b.mag = int(e.get("mag", b.mag))
++		b.reserve = int(e.get("reserve", b.reserve))
++	if e.has("crates") and "crates" in b:
++		b.crates = int(e["crates"])
++
++static func _built(e: Dictionary) -> bool:
++	return int(e.get("state", Building.BUILT)) == Building.BUILT
++
++# Called from main._ready after the world is set up (map already built with
++# the saved seed). Returns false if the save couldn't be used.
++static func restore(m, d: Dictionary) -> bool:
++	if d.is_empty():
++		return false
++	m.supplies = 1000000000
++	m.wave = int(d["wave"])
++	G.zombies.wave = m.wave
++	m.waves_cleared = int(d.get("waves_cleared", m.wave - 1))
++	m.repair_spent = int(d.get("repair_spent", 0))
++	G.zombies.kills = int(d.get("kills", 0))
++	G.walls.auto_rebuild = bool(d.get("auto_rebuild", true))
++	var scrap: Array = d.get("scrap", [])
++	for i in mini(scrap.size(), G.logi.salvage.size()):
++		G.logi.salvage[i].scrap = int(scrap[i])
++		G.logi.salvage[i].refresh()
++	if G.map:
++		for i in d.get("fences", []):
++			if int(i) < G.map.fences.size():
++				var run = G.map.fences[int(i)]
++				run.claimed = true
++				G.map.unblock(run.cells, run)
++				G.map.hide_run(run)
++		for c in d.get("claims", []):
++			var mb = G.map.buildings[int(c["i"])] if int(c["i"]) < G.map.buildings.size() else null
++			if mb == null:
++				continue
++			if bool(c.get("claimed", false)) or bool(c.get("dead", false)):
++				mb.contents = {}
++				mb._claimed(true)
++				mb.hp = clampf(float(c.get("hp", mb.max_hp)), 1.0, mb.max_hp)
++				if bool(c.get("dead", false)):
++					mb.destroy(false)
++			elif bool(c.get("exploded", false)):
++				mb.exploded = true
++				mb.def = mb.def.duplicate()
++				mb.def["claim"] = 0
++				mb.model.scale = Vector3(1, 0.7, 1)
++	for i in d.get("trench", []):
++		var c2 := Vector2i(int(i) % Defs.W, int(i) / Defs.W)
++		G.grid.set_trench(c2)
++		if G.terrain:
++			G.terrain.cell_changed(c2)
++		if m.decor:
++			m.decor.clear_cell(c2)
++	for e in d.get("segs", []):
++		var s: LinearStructure = G.walls._make(e["kind"], _v3(e["a"]), _v3(e["b"]), _built(e), bool(e.get("ported", false)), bool(e.get("heavy", false)))
++		_apply_common(s, e)
++	G.walls.refresh_posts()
++	var ids := {}
++	if G.map:
++		for i in G.map.buildings.size():
++			ids["m%d" % i] = G.map.buildings[i]
++	var things: Array = d.get("things", [])
++	for k in things.size():
++		var e2: Dictionary = things[k]
++		var b = _restore_thing(m, e2)
++		if b != null:
++			ids["b%d" % k] = b
++			_apply_common(b, e2)
++	m.zones.compute_now()
++	G.buildings.refresh_zones()
++	for e3 in d.get("guns", []):
++		var host = ids.get(e3["host"], null)
++		if host == null or not is_instance_valid(host) or host.state != Building.BUILT:
++			continue
++		var g = G.buildings.mount(host, int(e3["slot"]), e3["kind"], false, _built(e3))
++		_apply_common(g, e3)
++	if G.buildings.hq:
++		G.buildings.hq.hp = clampf(float(d.get("hq_hp", G.buildings.hq.max_hp)), 1.0, G.buildings.hq.max_hp)
++	G.logi.hq_crates = int(d.get("hq_crates", G.logi.hq_crates))
++	_restore_people(d)
++	for c3 in d.get("crews", []):
++		var post = ids.get(c3["host"], null)
++		if post == null or not is_instance_valid(post):
++			continue
++		for n in int(c3["n"]):
++			var idle: Array = G.soldiers.idle_soldiers()
++			if idle.is_empty() or post.free_slots() <= 0:
++				break
++			idle[0].assign(post)
++	m.zones.compute_now()
++	G.buildings.refresh_zones()
++	m.flow.compute_now()
++	if G.net:
++		G.net.dirty = true
++	m.supplies = int(d.get("supplies", Defs.START_SUPPLIES))
++	return true
++
++static func _restore_thing(m, e: Dictionary):
++	var kind: String = e["kind"]
++	var built := _built(e)
++	var b = null
++	match String(e.get("type", "")):
++		"ground":
++			var c: Vector2i = e["cell"]
++			if built:
++				b = G.buildings.place_built(kind, c)
++			elif G.buildings.place(kind, c, float(e.get("rest", 0.0))):
++				b = G.buildings.last_placed
++			if b != null and b.is_gun():
++				b.set_rest(float(e.get("rest", 0.0)))
++		"rect":
++			var p := _v3(e["pos"])
++			var yaw := float(e.get("yaw", 0.0))
++			b = G.buildings.place_rect(kind, p, yaw, built)
++			if b == null:
++				var near := []
++				for s in G.walls.live():
++					if s.seg_distance(p) < 4.0:
++						near.append(s)
++				b = G.buildings.place_rect(kind, p, yaw, built, near)
++			if b is RoomBlock and built:
++				for i in int(e.get("storeys", 1)) - 1:
++					b.finish_floor()
++			if b is Helipad and built and e.has("heli"):
++				b.heli = G.helis.add_heli(String(e["heli"]), b)
++				b.heli.park_now()
++				b.heli.rotor = 0.0
++				if G.sfx:
++					G.sfx.stop_loop(b.heli)
++		"nest":
++			var n := WallNest.new()
++			G.buildings.add_child(n)
++			n.setup_nest(_v3(e["pos"]), _v3(e["dir"]), String(e["wall"]), not built)
++			G.buildings.list.append(n)
++			if not built:
++				G.workers.add_job(n)
++			b = n
++		"bridge":
++			var pa := _v3(e["pa"])
++			var pb := _v3(e["pb"])
++			G.net.dirty = true
++			var aa: Dictionary = G.net.anchor_near(pa, pb)
++			var ab: Dictionary = G.net.anchor_near(pb, pa)
++			if not aa.is_empty() and not ab.is_empty():
++				b = G.buildings.place_bridge({"pos": pa, "ref": aa["ref"]}, {"pos": pb, "ref": ab["ref"]}, built)
++	return b
++
++static func _restore_people(d: Dictionary) -> void:
++	var p = G.people
++	for j in Defs.JOBS:
++		while p.count_job(j) > 0:
++			if p.remove_job(j) != "":
++				break
++	for c in p.civilians.duplicate():
++		if is_instance_valid(c):
++			c.queue_free()
++	p.civilians.clear()
++	var jobs: Dictionary = d.get("jobs", {})
++	var total := int(d.get("idle", 0))
++	for j in jobs:
++		total += int(jobs[j])
++	var door := Defs.hq_center() + Vector3(0, 0, 4.0)
++	for i in total:
++		p.spawn_civilian(door + Vector3(randf_range(-2.0, 2.0), 0, randf_range(0.0, 1.5)), true)
++	for j in jobs:
++		for i in int(jobs[j]):
++			p.add_job(j)
+diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
 --- a/scripts/ui/card_models.gd	2026-10-24 19:02:37.754539227 +0000
 +++ b/scripts/ui/card_models.gd	2026-10-24 19:04:07.169066872 +0000
 @@ -101,14 +101,16 @@
@@ -1094,7 +1569,76 @@ diff -ru src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
  
  class Ask:
  	extends RefCounted
-diff -ru src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
+diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
+--- a/scripts/ui/hud.gd	2026-10-24 19:02:37.754627210 +0000
++++ b/scripts/ui/hud.gd	2026-10-25 00:05:32.202419001 +0000
+@@ -3,6 +3,7 @@
+ signal tool_pressed(tool: String)
+ signal start_wave_pressed
+ signal play_pressed
++signal continue_pressed
+ signal restart_pressed
+ signal card_action(id: String, target)
+ signal plan_done
+@@ -328,7 +329,7 @@
+ 	banner.size = Vector2(minf(560.0, vs.x - 20.0), 110.0)
+ 	banner.position = Vector2(vs.x * 0.5 - banner.size.x * 0.5, vs.y * (0.24 if portrait else 0.26) - 30.0)
+ 	var tcw := minf(460.0, vs.x - 32.0)
+-	title_card.size = Vector2(tcw, 440.0)
++	title_card.size = Vector2(tcw, 440.0 + (70.0 if not save_info.is_empty() else 0.0))
+ 	title_card.position = (vs - title_card.size) * 0.5
+ 	over_card.size = Vector2(tcw, 230.0)
+ 	over_card.position = (vs - over_card.size) * 0.5
+@@ -867,8 +868,19 @@
+ 		text(ci, Vector2(sr.position.x, sr.position.y + 20.0), sub, 15, TEXT, font_bold, HORIZONTAL_ALIGNMENT_CENTER, sr.size.x)
+ var _map_rects := {}
+ var _play_rect := Rect2()
++var _continue_rect := Rect2()
++# {wave, map, people} of the save to continue, or empty.
++var save_info: Dictionary = {}:
++	set(v):
++		save_info = v
++		if title_card:
++			_layout()
++			title_card.queue_redraw()
+ 
+ func _title_press(p: Vector2) -> void:
++	if not save_info.is_empty() and _continue_rect.has_point(p):
++		continue_pressed.emit()
++		return
+ 	if _play_rect.has_point(p):
+ 		play_pressed.emit()
+ 		return
+@@ -912,9 +924,27 @@
+ 	var br := Rect2(r.position.x + r.size.x * 0.5 - 100, r.end.y - 78, 200, 56)
+ 	_play_rect = br
+ 	var sb := StyleBoxFlat.new()
+-	sb.bg_color = ACCENT
+ 	sb.set_corner_radius_all(18)
+ 	sb.anti_aliasing = true
++	if not save_info.is_empty():
++		var cr2 := Rect2(r.position.x + 16, r.end.y - 148, r.size.x - 32, 60)
++		_continue_rect = cr2
++		sb.bg_color = ACCENT
++		ci.draw_style_box(sb, cr2)
++		Icons.draw(ci, "play", Rect2(cr2.position.x + 22, cr2.position.y + 19, 22, 22), ACCENT_DK)
++		var map_name := String(save_info.get("map", "")).capitalize()
++		text(ci, Vector2(cr2.position.x + 30, cr2.position.y + 28), "CONTINUE", 21, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, cr2.size.x - 30)
++		text(ci, Vector2(cr2.position.x + 30, cr2.position.y + 48), "Wave %d  ·  %s  ·  %d people" % [int(save_info["wave"]), map_name, int(save_info.get("people", 0))], 13, ACCENT_DK, font_bold, HORIZONTAL_ALIGNMENT_CENTER, cr2.size.x - 30)
++		var sb3 := StyleBoxFlat.new()
++		sb3.set_corner_radius_all(18)
++		sb3.anti_aliasing = true
++		sb3.bg_color = Color(1, 1, 1, 0.06)
++		sb3.border_color = Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.7)
++		sb3.set_border_width_all(2)
++		ci.draw_style_box(sb3, br)
++		text(ci, Vector2(br.position.x, br.position.y + 35), "NEW GAME", 19, ACCENT, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
++		return
++	sb.bg_color = ACCENT
+ 	ci.draw_style_box(sb, br)
+ 	Icons.draw(ci, "play", Rect2(br.position.x + 40, br.position.y + 17, 22, 22), ACCENT_DK)
+ 	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
+diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
 +++ b/scripts/ui/icons.gd	2026-10-24 19:04:07.169619717 +0000
 @@ -334,7 +334,7 @@
@@ -1106,7 +1650,7 @@ diff -ru src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
  			return "auto"
  		"floor":
  			return "room_block"
-diff -ru src_orig/scripts/ui/world_overlay.gd src/scripts/ui/world_overlay.gd
+diff -ruN src_orig/scripts/ui/world_overlay.gd src/scripts/ui/world_overlay.gd
 --- a/scripts/ui/world_overlay.gd	2026-10-24 19:02:37.754738444 +0000
 +++ b/scripts/ui/world_overlay.gd	2026-10-24 19:07:05.110160545 +0000
 @@ -144,7 +144,7 @@

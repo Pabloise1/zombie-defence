@@ -27,6 +27,8 @@ var phase := "title"
 var phase_t := 0.0
 var waves_cleared := 0
 var repair_spent := 0
+var map_seed := 0
+var _save_t := 0.0
 var test_mode := false
 var manual_clock := false
 var _queue: Array = []
@@ -52,6 +54,8 @@ const GOAL_TEXT := "Wall in your HQ to make a safe zone"
 func _ready() -> void:
 	G.reset()
 	G.main = self
+	if not G.resume.is_empty():
+		G.map_id = String(G.resume["map"])
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--map="):
 			G.map_id = a.substr(6)
@@ -71,6 +75,11 @@ func _ready() -> void:
 		hud.show_title(true)
 		cam.focus(Defs.hq_center() + Vector3(0, 0, 6), 46.0)
 		cam.snap()
+	if not G.resume.is_empty() and not test_mode:
+		var d: Dictionary = G.resume
+		G.resume = {}
+		_continue(d)
+	hud.save_info = SaveGame.summary() if not test_mode else {}
 	var args := OS.get_cmdline_user_args()
 	for a in args:
 		_dev_arg(a)
@@ -769,7 +778,10 @@ func _setup_world() -> void:
 		mb.name = "Map"
 		add_child(mb)
 		G.map = mb
-		mb.build(SuburbLayout.data(), G.rng.randi())
+		map_seed = G.rng.randi()
+		if not G.resume.is_empty():
+			map_seed = int(G.resume.get("seed", map_seed))
+		mb.build(SuburbLayout.data(), map_seed)
 		people.ruins = mb.survivor_points()
 	cam = CameraRig.new()
 	cam.name = "Camera"
@@ -791,6 +803,7 @@ func _setup_world() -> void:
 	hud.tool_pressed.connect(_on_tool_pressed)
 	hud.start_wave_pressed.connect(start_wave)
 	hud.play_pressed.connect(_on_play)
+	hud.continue_pressed.connect(_on_continue)
 	hud.restart_pressed.connect(_on_restart)
 	hud.card_action.connect(_on_card_action)
 	builder.tool_changed.connect(_on_tool_changed)
@@ -936,6 +949,10 @@ func sim_step(dt: float) -> void:
 	match phase:
 		"build":
 			phase_t -= dt
+			_save_t -= dt
+			if _save_t <= 0.0:
+				_save_t = 20.0
+				autosave()
 			if phase_t <= 0.0 and not test_mode:
 				start_wave()
 		"wave":
@@ -1272,6 +1289,7 @@ func _edge_text() -> String:
 func start_wave() -> void:
 	if phase != "build":
 		return
+	autosave()
 	phase = "wave"
 	zombies.wave = wave
 	_wave_t = 0.0
@@ -1370,11 +1388,42 @@ func _wave_cleared() -> void:
 	for t in Defs.TOOLS:
 		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
 			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
+	_save_t = 20.0
+	autosave()
+
+func autosave() -> void:
+	if test_mode or manual_clock or phase == "title" or phase == "over":
+		return
+	SaveGame.write(self)
+
+func _on_continue() -> void:
+	var d := SaveGame.read()
+	if d.is_empty():
+		hud.toast("That save can't be loaded")
+		_ui("ui_invalid")
+		return
+	_ui("ui_confirm")
+	G.resume = d
+	get_tree().reload_current_scene()
+
+func _continue(d: Dictionary) -> void:
+	hud.show_title(false)
+	if not SaveGame.restore(self, d):
+		hud.show_title(true)
+		return
+	phase = "build"
+	phase_t = maxf(float(d.get("phase_t", 0.0)), 30.0)
+	_save_t = 20.0
+	_plan_edges()
+	cam.focus(Defs.hq_center() + Vector3(0, 0, 4), 38.0)
+	cam.snap()
+	hud.show_banner("WELCOME BACK", "Wave %d comes from the %s" % [wave, _edge_text()])
 
 func on_hq_destroyed() -> void:
 	if phase == "over":
 		return
 	phase = "over"
+	SaveGame.clear()
 	builder.set_tool("")
 	builder.select(null)
 	_queue.clear()

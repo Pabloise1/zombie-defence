@@ -22,6 +22,8 @@ var net = null
 var helis = null
 var rng := RandomNumberGenerator.new()
 var sim_time := 0.0
+# A save to continue from on the next scene load (survives reset()).
+var resume: Dictionary = {}
 
 func reset() -> void:
 	main = null

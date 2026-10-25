@@ -104,7 +104,7 @@ func work(dt: float) -> bool:
 		return true
 	return false
 
-func _claimed() -> void:
+func _claimed(quiet: bool = false) -> void:
 	claiming = false
 	claimed = true
 	progress = 1.0
@@ -116,6 +116,8 @@ func _claimed() -> void:
 	G.buildings.list.append(self)
 	G.buildings.refresh_zones()
 	G.grid.notify_paths_changed()
+	if quiet:
+		return
 	_pop = 1.0
 	if G.fx:
 		G.fx.dust(position + Vector3(0, 0.4, 0), 2.0)

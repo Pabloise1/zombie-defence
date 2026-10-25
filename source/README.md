@@ -21,14 +21,44 @@ python3 source/tools/repack.py index.pck source new.pck && mv new.pck index.pck
 After that, update `"index.pck":<size>` in `index.html` and bump `CACHE_VERSION`
 in `index.service.worker.js`, so installed copies download the new pack.
 
+## Textures (important for phones)
+
+v0.6.2 shipped every texture as lossy WebP. GPUs can't use WebP directly, so
+each one was unpacked to raw RGBA when it loaded: about 570 MB of texture
+memory for a suburb base, enough for iOS to kill and reload the page. The
+pack's textures are now ETC2, which phones read directly: 512 px for colour
+maps, 256 px for normal and ORM maps. That's about 50 MB in total and looks
+the same from the game camera.
+
+**In your Godot project, set this in the texture import settings before your
+next export:** Compress > Mode = VRAM Compressed and Process > Size Limit =
+512. Otherwise the export brings the WebP textures back. To redo it on a
+built pack instead:
+
+```sh
+LIST=ctex_list.txt OUT=retex godot --headless --main-pack index.pck -s source/tools/retex.gd
+python3 source/tools/write_ctex.py index.pck retex overrides
+python3 source/tools/repack.py index.pck source new.pck overrides
+```
+
+## Save game
+
+`scripts/save_game.gd` autosaves to `user://save.dat` (IndexedDB on the web)
+when a wave is cleared, when one starts, and every 20 s while building. The
+title then shows CONTINUE. Losing the HQ deletes the save. A reload during a
+wave puts you back at the start of that wave.
+
 ## Tools
 
 - `tools/pck.py`: list and extract files from a `.pck`.
 - `tools/gdc.py`: turn a compiled `.gdc` (Godot 4.3+ token format) back into source.
-- `tools/repack.py`: put text scripts back into a `.pck`.
+- `tools/repack.py`: put text scripts (and optional replacement files) back into a `.pck`. It also registers new `class_name` scripts in the global class cache.
 - `tools/loadall.gd`: compile-check every script against a pack (run with Godot `--headless -s`, `LIST=` a file of `res://` paths).
 - `tools/audit.gd`: plays waves headless with the real economy and prints ammo, crates, income and repairs per wave (`LAYOUT=square|mixed`).
 - `tools/civtest.gd`: scenario checks for fetcher rescues, safe houses and room block gun slots (`TEST=rescue|shelter|block`; shelter needs `-- --map=suburb`).
+- `tools/retex.gd` and `tools/write_ctex.py`: re-encode a pack's textures as ETC2 (see above).
+- `tools/texmem.gd`: GPU memory use for a big suburb base (needs a real renderer, e.g. `xvfb-run ... --rendering-driver opengl3`).
+- `tools/savetest.gd`: save round trip. Builds a varied base, saves, reloads, compares, and prints `SAVE MATCH`.
 - `tools/soak.gd`: long headless run that prints object, node and memory counts per wave, to catch leaks.
 
 Example: `LAYOUT=square ./Godot_v4.7.2-stable_linux.x86_64 --headless --main-pack index.pck -s source/tools/audit.gd`
