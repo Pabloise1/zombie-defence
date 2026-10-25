@@ -3,7 +3,7 @@ extends RefCounted
 
 const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
 	"clinic": "heart", "water_tower": "watchtower", "container": "depot", "pillbox": "garrison", "armory": "soldier", "scrapyard": "supplies",
-	"fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
+	"cannon": "turret", "fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
 	"lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
 
 static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:

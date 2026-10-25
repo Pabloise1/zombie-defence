@@ -578,6 +578,22 @@ func _placeholder(kind: String) -> Node3D:
 			muzzle.name = "Muzzle"
 			muzzle.position = Vector3(0, 0, -1.12)
 			barrel.add_child(muzzle)
+		"autocannon":
+			_mi(_cached("turret_base", _mesh_turret_base), mat_vc, root, "Base")
+			var cy := Node3D.new()
+			cy.name = "Yaw"
+			cy.position = Vector3(0, 0.95, 0)
+			root.add_child(cy)
+			_mi(_cached("cannon_yaw", _mesh_cannon_yaw), mat_vc_metal, cy)
+			var cb := Node3D.new()
+			cb.name = "Barrel"
+			cb.position = Vector3(0, 0.12, -0.45)
+			cy.add_child(cb)
+			_mi(_cached("cannon_barrel", _mesh_cannon_barrel), mat_vc_metal, cb)
+			var cm := Marker3D.new()
+			cm.name = "Muzzle"
+			cm.position = Vector3(0, 0, -1.75)
+			cb.add_child(cm)
 		"spike_trap":
 			_mi(_cached("spike_base", _mesh_spike_base), mat_vc, root, "Base")
 			var sp := Node3D.new()
@@ -978,6 +994,22 @@ func fort_module_mesh(concrete: bool, masks: Array, par: int) -> ArrayMesh:
 	var mesh := k.build()
 	_meshes[key] = mesh
 	return mesh
+
+func _mesh_cannon_yaw() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.cyl(0.55, 0.6, 0.18, Vector3(0, 0.0, 0), C_GUNMETAL, Vector3.ZERO, 14)
+	k.box(Vector3(0.9, 0.55, 1.0), Vector3(0, 0.32, 0.05), C_OLIVE)
+	k.box(Vector3(1.4, 0.9, 0.08), Vector3(0, 0.45, -0.5), C_OLIVE_LT, Vector3(-0.12, 0, 0))
+	k.box(Vector3(0.36, 0.3, 0.5), Vector3(0.55, 0.3, 0.3), C_OLIVE)
+	k.box(Vector3(0.16, 0.5, 0.12), Vector3(-0.35, 0.75, 0.35), C_METAL)
+	return k.build()
+
+func _mesh_cannon_barrel() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.cyl(0.11, 0.13, 1.6, Vector3(0, 0, -0.9), C_GUNMETAL, Vector3(PI * 0.5, 0, 0), 10)
+	k.cyl(0.17, 0.17, 0.32, Vector3(0, 0, -1.6), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
+	k.cyl(0.2, 0.2, 0.35, Vector3(0, 0, -0.08), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
+	return k.build()
 
 func _mesh_water_tower() -> ArrayMesh:
 	var k := MeshKit.new()

@@ -32,7 +32,7 @@ const FETCH_FIND := 0.2
 const SALVAGE_SCRAP := 120
 const FUEL_RANGE := 14.0
 const RADIO_GROUPS := 1
-const MOUNTABLE := ["turret", "sniper", "mortar", "flame"]
+const MOUNTABLE := ["turret", "sniper", "mortar", "flame", "cannon"]
 const PORT_BONUS := 0.25
 const PORT_GUARD := 0.5
 const MOVE_COST := 0.25
@@ -50,6 +50,12 @@ const BUILD := {
 		"ground": true, "trench": false, "line": false, "model": "turret_mg",
 		"mag": 60, "reload": 3.0, "reserve": 240,
 		"hint": "Tap to place a machine gun", "about": "Fast fire, mid range",
+	},
+	"cannon": {
+		"name": "Cannon", "long": "Autocannon", "cost": 180, "time": 7.0, "hp": 320.0, "blocks": true, "zcost": 10.0,
+		"ground": true, "trench": false, "line": false, "model": "autocannon", "unlock": 4,
+		"mag": 12, "reload": 4.0, "reserve": 72,
+		"hint": "Tap to place an autocannon", "about": "Heavy shells that burst  ·  brutes first",
 	},
 	"mortar": {
 		"name": "Mortar", "long": "Mortar Pit", "cost": 155, "time": 7.0, "hp": 200.0, "blocks": true, "zcost": 10.0,
@@ -323,14 +329,14 @@ const BUILD := {
 	},
 }
 const TABS := [
-	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
+	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]},
 	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
 	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
 	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
 ]
-const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "concrete", "wall", "gate", "platform", "wire",
+const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon", "concrete", "wall", "gate", "platform", "wire",
 	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
 	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
 	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
@@ -369,7 +375,7 @@ const MAPS := [
 ]
 const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
 	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard"]
-const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
+const GUNS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]
 const SOLDIER_MAX := 40
 const SOLDIER_HP := 70.0
 const SOLDIER_RANGE := 14.0
@@ -393,6 +399,11 @@ const WIRE_WEAR := 7.0
 const TURRET_RANGE := 13.0
 const TURRET_RATE := 6.0
 const TURRET_DAMAGE := 6.0
+const CANNON_RANGE := 16.0
+const CANNON_INTERVAL := 0.7
+const CANNON_DAMAGE := 34.0
+const CANNON_SPLASH := 1.8
+const CANNON_SPLASH_DAMAGE := 16.0
 const SPIKE_INTERVAL := 0.5
 const SPIKE_DAMAGE := 14.0
 const MINE_RADIUS := 4.0
@@ -446,6 +457,8 @@ static func gun_range(kind: String) -> float:
 	match kind:
 		"turret":
 			return TURRET_RANGE
+		"cannon":
+			return CANNON_RANGE
 		"mortar":
 			return MORTAR_MAX
 		"sniper":

@@ -63,7 +63,7 @@ func tick(dt: float) -> void:
 		target = null
 	if crew_ok() and (target == null or _retarget <= 0.0):
 		_retarget = 0.2
-		target = G.zombies.nearest(global_position, rng)
+		target = _pick_target(rng)
 	if target != null:
 		var tp: Vector3 = target.aim_point()
 		var parent := yaw_n.get_parent() as Node3D
@@ -92,6 +92,9 @@ func tick(dt: float) -> void:
 		_firing_t -= dt
 		if _firing_t <= 0.0 and _casings:
 			_casings.emitting = false
+
+func _pick_target(rng: float):
+	return G.zombies.nearest(global_position, rng)
 
 func _fire(tp: Vector3) -> void:
 	_cd = 1.0 / Defs.TURRET_RATE

@@ -1,7 +1,30 @@
 diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 --- a/scripts/art.gd	2026-10-24 19:02:37.756440030 +0000
-+++ b/scripts/art.gd	2026-10-25 06:29:50.931715797 +0000
-@@ -727,6 +727,45 @@
++++ b/scripts/art.gd	2026-10-25 06:33:22.583759280 +0000
+@@ -578,6 +578,22 @@
+ 			muzzle.name = "Muzzle"
+ 			muzzle.position = Vector3(0, 0, -1.12)
+ 			barrel.add_child(muzzle)
++		"autocannon":
++			_mi(_cached("turret_base", _mesh_turret_base), mat_vc, root, "Base")
++			var cy := Node3D.new()
++			cy.name = "Yaw"
++			cy.position = Vector3(0, 0.95, 0)
++			root.add_child(cy)
++			_mi(_cached("cannon_yaw", _mesh_cannon_yaw), mat_vc_metal, cy)
++			var cb := Node3D.new()
++			cb.name = "Barrel"
++			cb.position = Vector3(0, 0.12, -0.45)
++			cy.add_child(cb)
++			_mi(_cached("cannon_barrel", _mesh_cannon_barrel), mat_vc_metal, cb)
++			var cm := Marker3D.new()
++			cm.name = "Muzzle"
++			cm.position = Vector3(0, 0, -1.75)
++			cb.add_child(cm)
+ 		"spike_trap":
+ 			_mi(_cached("spike_base", _mesh_spike_base), mat_vc, root, "Base")
+ 			var sp := Node3D.new()
+@@ -727,6 +743,45 @@
  			_mi(_cached("scrap_bundle", _mesh_scrap_bundle), mat_vc_metal, root, "Body")
  		"fetcher":
  			_build_worker(root, true)
@@ -47,7 +70,7 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
  		_:
  			var k := MeshKit.new()
  			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
-@@ -846,6 +885,186 @@
+@@ -846,6 +901,202 @@
  	k.box(Vector3(0.6, 0.4, 0.5), Vector3(0.5, 0.45, 0.4), C_OLIVE)
  	return k.build()
  
@@ -144,6 +167,22 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +	var mesh := k.build()
 +	_meshes[key] = mesh
 +	return mesh
++
++func _mesh_cannon_yaw() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.cyl(0.55, 0.6, 0.18, Vector3(0, 0.0, 0), C_GUNMETAL, Vector3.ZERO, 14)
++	k.box(Vector3(0.9, 0.55, 1.0), Vector3(0, 0.32, 0.05), C_OLIVE)
++	k.box(Vector3(1.4, 0.9, 0.08), Vector3(0, 0.45, -0.5), C_OLIVE_LT, Vector3(-0.12, 0, 0))
++	k.box(Vector3(0.36, 0.3, 0.5), Vector3(0.55, 0.3, 0.3), C_OLIVE)
++	k.box(Vector3(0.16, 0.5, 0.12), Vector3(-0.35, 0.75, 0.35), C_METAL)
++	return k.build()
++
++func _mesh_cannon_barrel() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.cyl(0.11, 0.13, 1.6, Vector3(0, 0, -0.9), C_GUNMETAL, Vector3(PI * 0.5, 0, 0), 10)
++	k.cyl(0.17, 0.17, 0.32, Vector3(0, 0, -1.6), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
++	k.cyl(0.2, 0.2, 0.35, Vector3(0, 0, -0.08), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
++	return k.build()
 +
 +func _mesh_water_tower() -> ArrayMesh:
 +	var k := MeshKit.new()
@@ -402,8 +441,8 @@ diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
  
 diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
 --- a/scripts/building_manager.gd	2026-10-24 19:02:37.756247153 +0000
-+++ b/scripts/building_manager.gd	2026-10-25 06:29:50.933607155 +0000
-@@ -29,6 +29,8 @@
++++ b/scripts/building_manager.gd	2026-10-25 06:33:22.582488555 +0000
+@@ -29,11 +29,15 @@
  			return StairsTower.new()
  		"helipad", "helipad_large":
  			return Helipad.new()
@@ -412,6 +451,55 @@ diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
  	if Defs.is_prefab(kind):
  		return PrefabBuilding.new()
  	match kind:
+ 		"turret":
+ 			return Turret.new()
++		"cannon":
++			return Cannon.new()
+ 		"spikes":
+ 			return SpikeTrap.new()
+ 		"mine":
+diff -ruN src_orig/scripts/buildings/cannon.gd src/scripts/buildings/cannon.gd
+--- a/scripts/buildings/cannon.gd	1970-01-01 00:00:00.000000000 +0000
++++ b/scripts/buildings/cannon.gd	2026-10-25 06:33:22.587249022 +0000
+@@ -0,0 +1,38 @@
++class_name Cannon
++extends Turret
++# Autocannon: slow, heavy shells that burst on impact. Goes for brutes first,
++# then runners, then whatever is closest.
++
++func _pick_target(rng: float):
++	return G.zombies.best_threat(global_position, rng)
++
++func _fire(tp: Vector3) -> void:
++	_cd = Defs.CANNON_INTERVAL
++	shots += 1
++	var from := muzzle.global_position
++	var was_alive: bool = target.alive
++	var at: Vector3 = target.position
++	target.hurt(Defs.CANNON_DAMAGE, from)
++	if was_alive and not target.alive:
++		kills += 1
++	var r2 := Defs.CANNON_SPLASH * Defs.CANNON_SPLASH
++	for z in G.zombies.alive_list:
++		if z == target or not z.alive:
++			continue
++		var dx: float = z.position.x - at.x
++		var dz: float = z.position.z - at.z
++		if dx * dx + dz * dz < r2:
++			z.hurt(Defs.CANNON_SPLASH_DAMAGE, at)
++			if not z.alive:
++				kills += 1
++	_recoil = 1.0
++	_flash_t = 0.07
++	_flash.visible = true
++	_flash.rotation.z = randf() * TAU
++	_flash.scale = Vector3.ONE * randf_range(1.2, 1.6)
++	if G.fx:
++		G.fx.tracer(from, tp, 1)
++		G.fx.hit(tp, (tp - from).normalized(), 1)
++		G.fx.dirt(Vector3(at.x, at.y + 0.2, at.z))
++	if G.sfx:
++		G.sfx.play("sniper", from)
 diff -ruN src_orig/scripts/buildings/fort_module.gd src/scripts/buildings/fort_module.gd
 --- a/scripts/buildings/fort_module.gd	1970-01-01 00:00:00.000000000 +0000
 +++ b/scripts/buildings/fort_module.gd	2026-10-25 06:31:20.729332240 +0000
@@ -849,6 +937,28 @@ diff -ruN src_orig/scripts/buildings/supply_device.gd src/scripts/buildings/supp
  		"fuel":
  			var n := 0
  			for b in G.buildings.built_of("flame"):
+diff -ruN src_orig/scripts/buildings/turret.gd src/scripts/buildings/turret.gd
+--- a/scripts/buildings/turret.gd	2026-10-24 19:02:37.755300334 +0000
++++ b/scripts/buildings/turret.gd	2026-10-25 06:33:22.581645680 +0000
+@@ -63,7 +63,7 @@
+ 		target = null
+ 	if crew_ok() and (target == null or _retarget <= 0.0):
+ 		_retarget = 0.2
+-		target = G.zombies.nearest(global_position, rng)
++		target = _pick_target(rng)
+ 	if target != null:
+ 		var tp: Vector3 = target.aim_point()
+ 		var parent := yaw_n.get_parent() as Node3D
+@@ -93,6 +93,9 @@
+ 		if _firing_t <= 0.0 and _casings:
+ 			_casings.emitting = false
+ 
++func _pick_target(rng: float):
++	return G.zombies.nearest(global_position, rng)
++
+ func _fire(tp: Vector3) -> void:
+ 	_cd = 1.0 / Defs.TURRET_RATE
+ 	shots += 1
 diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 --- a/scripts/civilian.gd	2026-10-24 19:02:37.755483804 +0000
 +++ b/scripts/civilian.gd	2026-10-24 20:03:49.628893333 +0000
@@ -937,7 +1047,7 @@ diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 +	_plan_refuge()
 diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
-+++ b/scripts/defs.gd	2026-10-25 06:29:50.932543403 +0000
++++ b/scripts/defs.gd	2026-10-25 06:48:07.078033194 +0000
 @@ -24,7 +24,7 @@
  const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
  const START_CRATES := 6
@@ -947,7 +1057,29 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const CRAFT_TIME := 8.0
  const CRAFTERS_PER_WORKSHOP := 2
  const FETCH_LOAD := 25
-@@ -224,18 +224,117 @@
+@@ -32,7 +32,7 @@
+ const SALVAGE_SCRAP := 120
+ const FUEL_RANGE := 14.0
+ const RADIO_GROUPS := 1
+-const MOUNTABLE := ["turret", "sniper", "mortar", "flame"]
++const MOUNTABLE := ["turret", "sniper", "mortar", "flame", "cannon"]
+ const PORT_BONUS := 0.25
+ const PORT_GUARD := 0.5
+ const MOVE_COST := 0.25
+@@ -51,6 +51,12 @@
+ 		"mag": 60, "reload": 3.0, "reserve": 240,
+ 		"hint": "Tap to place a machine gun", "about": "Fast fire, mid range",
+ 	},
++	"cannon": {
++		"name": "Cannon", "long": "Autocannon", "cost": 180, "time": 7.0, "hp": 320.0, "blocks": true, "zcost": 10.0,
++		"ground": true, "trench": false, "line": false, "model": "autocannon", "unlock": 4,
++		"mag": 12, "reload": 4.0, "reserve": 72,
++		"hint": "Tap to place an autocannon", "about": "Heavy shells that burst  ·  brutes first",
++	},
+ 	"mortar": {
+ 		"name": "Mortar", "long": "Mortar Pit", "cost": 155, "time": 7.0, "hp": 200.0, "blocks": true, "zcost": 10.0,
+ 		"ground": true, "trench": false, "line": false, "model": "mortar_pit", "unlock": 3,
+@@ -224,18 +230,117 @@
  		"ground": true, "trench": false, "line": true, "model": "",
  		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
  	},
@@ -1050,19 +1182,21 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 +	},
  }
  const TABS := [
- 	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
+-	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
 -	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire"]},
 -	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower"]},
 -	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large"]},
 -	{"id": "supply", "name": "Supply", "tools": ["ammo_point", "radio", "fuel"]},
 -	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "remove"]},
++	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]},
 +	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
 +	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
 +	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 +	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 +	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
  ]
- const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "concrete", "wall", "gate", "platform", "wire",
+-const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "concrete", "wall", "gate", "platform", "wire",
++const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon", "concrete", "wall", "gate", "platform", "wire",
  	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
 -	"ammo_point", "radio", "fuel", "spikes", "mine", "dig"]
 +	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
@@ -1071,17 +1205,31 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const MAP_BUILDINGS := {
  	"house_two_storey": {
  		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
-@@ -268,7 +367,8 @@
+@@ -268,8 +373,9 @@
  	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
  	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
  ]
 -const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large"]
+-const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
 +const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
 +	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard"]
- const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
++const GUNS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]
  const SOLDIER_MAX := 40
  const SOLDIER_HP := 70.0
-@@ -301,6 +401,7 @@
+ const SOLDIER_RANGE := 14.0
+@@ -293,6 +399,11 @@
+ const TURRET_RANGE := 13.0
+ const TURRET_RATE := 6.0
+ const TURRET_DAMAGE := 6.0
++const CANNON_RANGE := 16.0
++const CANNON_INTERVAL := 0.7
++const CANNON_DAMAGE := 34.0
++const CANNON_SPLASH := 1.8
++const CANNON_SPLASH_DAMAGE := 16.0
+ const SPIKE_INTERVAL := 0.5
+ const SPIKE_DAMAGE := 14.0
+ const MINE_RADIUS := 4.0
+@@ -301,6 +412,7 @@
  const Z_RUNNER := 1
  const Z_BRUTE := 2
  const REFUND_BUILT := 0.5
@@ -1089,6 +1237,15 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const Z_HP_GROWTH := 0.38
  const Z_HP_LATE := 0.05
  const Z_HP := [33.0, 23.0, 330.0]
+@@ -345,6 +457,8 @@
+ 	match kind:
+ 		"turret":
+ 			return TURRET_RANGE
++		"cannon":
++			return CANNON_RANGE
+ 		"mortar":
+ 			return MORTAR_MAX
+ 		"sniper":
 diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
 --- a/scripts/fetcher.gd	2026-10-24 19:02:37.756064080 +0000
 +++ b/scripts/fetcher.gd	2026-10-25 01:15:43.088363045 +0000
@@ -2562,14 +2719,14 @@ diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
  	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
 diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
-+++ b/scripts/ui/icons.gd	2026-10-25 06:29:50.972016115 +0000
++++ b/scripts/ui/icons.gd	2026-10-25 06:33:22.583098180 +0000
 @@ -1,7 +1,13 @@
  class_name Icons
  extends RefCounted
  
 +const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
 +	"clinic": "heart", "water_tower": "watchtower", "container": "depot", "pillbox": "garrison", "armory": "soldier", "scrapyard": "supplies",
-+	"fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
++	"cannon": "turret", "fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
 +	"lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
 +
  static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:

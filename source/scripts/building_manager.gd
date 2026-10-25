@@ -36,6 +36,8 @@ func _make(kind: String) -> Building:
 	match kind:
 		"turret":
 			return Turret.new()
+		"cannon":
+			return Cannon.new()
 		"spikes":
 			return SpikeTrap.new()
 		"mine":
