@@ -32,6 +32,12 @@ func remove_soldier(s: Soldier) -> void:
 	soldiers.erase(s)
 	changed.emit()
 
+# Rifle damage, with the Armory bonus.
+func damage() -> float:
+	if G.buildings and G.buildings.count_built("armory") > 0:
+		return Defs.SOLDIER_DAMAGE * 1.25
+	return Defs.SOLDIER_DAMAGE
+
 func idle_soldiers() -> Array:
 	var out := []
 	for s in soldiers:
@@ -308,7 +314,7 @@ func pick_target(p: Vector3, r: float, current = null):
 				if z.kind == Defs.Z_BRUTE:
 					score -= 9.0
 				var others: int = z.aimed - (1 if z == current else 0)
-				if others > 0 and z.hp <= others * Defs.SOLDIER_DAMAGE:
+				if others > 0 and z.hp <= others * damage():
 					score += 12.0
 				else:
 					score += others * 2.5

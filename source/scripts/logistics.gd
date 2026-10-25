@@ -164,6 +164,7 @@ func pick_salvage(p: Vector3):
 	return best
 
 func on_wave_cleared() -> void:
+	var regrow := 40 if G.buildings.count_built("scrapyard") > 0 else 20
 	for s in salvage:
-		s.scrap = mini(s.scrap_max, s.scrap + 20)
+		s.scrap = mini(s.scrap_max, s.scrap + regrow)
 		s.refresh()

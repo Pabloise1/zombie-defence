@@ -79,6 +79,10 @@ func card_lines() -> Array:
 			out.append("+%d supplies after every wave it survives" % int(def.get("income", 0)))
 		"clinic":
 			out.append("Heals people and soldiers within %d m" % int(def.get("heal_range", 14.0)))
+		"armory":
+			out.append("All soldiers do +25%% damage (%.0f a shot)" % G.soldiers.damage())
+		"scrapyard":
+			out.append("Fetchers' hauls +50%  ·  scrap piles refill twice as fast")
 		_:
 			out.append(String(def.get("about", "")))
 	var free := 0

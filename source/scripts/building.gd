@@ -360,7 +360,7 @@ func port_tick(dt: float) -> void:
 				bd = dd
 				from = p
 		var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
-		z.hurt(Defs.SOLDIER_DAMAGE, from)
+		z.hurt(G.soldiers.damage(), from)
 		if s.visible:
 			s.face_point(z.position)
 			s._fire_t = 0.22

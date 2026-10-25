@@ -743,6 +743,26 @@ func _placeholder(kind: String) -> Node3D:
 		"clinic":
 			_mi(_cached("clinic", _mesh_clinic), mat_vc, root, "Body")
 			_marker(root, "Door", Vector3(0, 0, 1.9))
+		"water_tower":
+			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
+			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
+			_marker(root, "Door", Vector3(0, 0, 2.2))
+		"container":
+			var cv := randi() % 4
+			_mi(_cached("container_%d" % cv, func(): return _mesh_container(cv)), mat_vc, root, "Body")
+			_marker(root, "RoofSlot1", Vector3(0, 2.62, 0))
+		"pillbox":
+			_mi(_cached("pillbox", _mesh_pillbox), mat_vc, root, "Body")
+			_marker(root, "Port1", Vector3(0, 1.15, -1.7))
+			_marker(root, "Port2", Vector3(1.7, 1.15, 0), -PI * 0.5)
+			_marker(root, "Port3", Vector3(-1.7, 1.15, 0), PI * 0.5)
+			_marker(root, "Door", Vector3(0, 0, 2.1))
+		"armory":
+			_mi(_cached("armory", _mesh_armory), mat_vc, root, "Body")
+			_marker(root, "Door", Vector3(0, 0, 1.9))
+		"scrapyard":
+			_mi(_cached("scrapyard", _mesh_scrapyard), mat_vc_metal, root, "Body")
+			_marker(root, "Door", Vector3(0, 0, 2.4))
 		_:
 			var k := MeshKit.new()
 			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
@@ -911,6 +931,92 @@ func _mesh_clinic() -> ArrayMesh:
 	for x in [-1.4, 1.4]:
 		k.box(Vector3(0.7, 0.6, 0.05), Vector3(x, 1.7, 1.42), Color(0.45, 0.6, 0.65))
 	k.box(Vector3(1.6, 0.08, 0.9), Vector3(0, 2.25, 1.85), white)
+	return k.build()
+
+func _mesh_water_tower() -> ArrayMesh:
+	var k := MeshKit.new()
+	for x in [-1.1, 1.1]:
+		for z in [-1.1, 1.1]:
+			k.box(Vector3(0.5, 0.3, 0.5), Vector3(x, 0.15, z), C_CONCRETE)
+			k.cyl(0.11, 0.14, 8.6, Vector3(x * 0.9, 4.4, z * 0.9), C_METAL, Vector3(-z * 0.03, 0, x * 0.03))
+	for y in [2.6, 5.4]:
+		for side in [Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(-1, 0, 0)]:
+			var along := Vector3(0, PI * 0.5, 0) if side.x != 0.0 else Vector3.ZERO
+			k.box(Vector3(2.0, 0.07, 0.07), Vector3(side.x, y, side.z) * Vector3(0.98, 1, 0.98), C_METAL, along)
+	k.cyl(1.35, 1.35, 1.9, Vector3(0, 9.6, 0), Color(0.55, 0.6, 0.62), Vector3.ZERO, 16)
+	k.cyl(1.45, 1.45, 0.12, Vector3(0, 8.65, 0), C_METAL, Vector3.ZERO, 16)
+	k.cyl(1.5, 1.5, 0.16, Vector3(0, 10.62, 0), C_CONCRETE_DK, Vector3.ZERO, 16)
+	for i in 10:
+		var a := i * TAU / 10.0
+		k.box(Vector3(0.55, 0.28, 0.3), Vector3(sin(a) * 1.3, 10.84, cos(a) * 1.3), C_FABRIC, Vector3(0, a, 0))
+	for j in 14:
+		k.box(Vector3(0.5, 0.05, 0.05), Vector3(0, 0.6 + j * 0.62, 1.12), C_METAL)
+	k.box(Vector3(0.05, 8.6, 0.05), Vector3(-0.25, 4.6, 1.12), C_METAL)
+	k.box(Vector3(0.05, 8.6, 0.05), Vector3(0.25, 4.6, 1.12), C_METAL)
+	return k.build()
+
+func _mesh_container(v: int) -> ArrayMesh:
+	var k := MeshKit.new()
+	var col: Color = [Color(0.55, 0.18, 0.12), Color(0.16, 0.32, 0.48), Color(0.3, 0.42, 0.2), Color(0.62, 0.5, 0.18)][v % 4]
+	var dk := col.darkened(0.3)
+	k.box(Vector3(6.0, 2.5, 2.4), Vector3(0, 1.3, 0), col)
+	for i in 13:
+		var x := -2.8 + i * 0.467
+		k.box(Vector3(0.08, 2.3, 2.46), Vector3(x, 1.3, 0), dk)
+	for x in [-2.98, 2.98]:
+		for z in [-1.18, 1.18]:
+			k.box(Vector3(0.14, 2.6, 0.14), Vector3(x, 1.3, z), C_METAL)
+	k.box(Vector3(0.06, 2.2, 1.0), Vector3(3.02, 1.3, -0.55), dk)
+	k.box(Vector3(0.06, 2.2, 1.0), Vector3(3.02, 1.3, 0.55), dk)
+	k.box(Vector3(0.04, 2.0, 0.06), Vector3(3.06, 1.3, -0.3), C_METAL)
+	k.box(Vector3(0.04, 2.0, 0.06), Vector3(3.06, 1.3, 0.3), C_METAL)
+	return k.build()
+
+func _mesh_pillbox() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.box(Vector3(3.3, 0.2, 3.3), Vector3(0, 0.1, 0), C_CONCRETE_DK)
+	k.box(Vector3(3.0, 0.8, 3.0), Vector3(0, 0.6, 0), C_CONCRETE)
+	k.box(Vector3(3.0, 0.22, 3.0), Vector3(0, 1.11, 0), C_DARK)
+	for p in [Vector3(0, 1.11, -1.38), Vector3(1.38, 1.11, 0), Vector3(-1.38, 1.11, 0), Vector3(0, 1.11, 1.38)]:
+		k.box(Vector3(0.5, 0.24, 0.5), p, C_CONCRETE)
+	k.box(Vector3(3.0, 0.5, 3.0), Vector3(0, 1.47, 0), C_CONCRETE)
+	k.box(Vector3(3.4, 0.25, 3.4), Vector3(0, 1.82, 0), C_CONCRETE_DK)
+	k.box(Vector3(0.9, 1.0, 0.06), Vector3(0, 0.6, 1.52), C_METAL)
+	for i in 8:
+		var a := i * TAU / 8.0
+		k.box(Vector3(0.7, 0.3, 0.4), Vector3(sin(a) * 1.25, 2.1, cos(a) * 1.25), C_FABRIC, Vector3(0, a, 0))
+	return k.build()
+
+func _mesh_armory() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.box(Vector3(4.1, 0.2, 3.1), Vector3(0, 0.1, 0), C_CONCRETE)
+	k.box(Vector3(3.8, 2.4, 2.8), Vector3(0, 1.4, 0), C_OLIVE)
+	k.prism(Vector3(3.1, 0.8, 4.0), Vector3(0, 3.0, 0), C_OLIVE_LT, Vector3(0, PI * 0.5, 0))
+	k.box(Vector3(1.4, 1.8, 0.06), Vector3(0, 1.1, 1.42), C_METAL)
+	k.box(Vector3(1.0, 0.5, 0.06), Vector3(0, 2.3, 1.42), C_SAND)
+	k.box(Vector3(0.7, 0.07, 0.07), Vector3(0, 2.3, 1.46), C_DARK, Vector3(0, 0, 0.6))
+	k.box(Vector3(0.7, 0.07, 0.07), Vector3(0, 2.3, 1.46), C_DARK, Vector3(0, 0, -0.6))
+	for x in [-1.5, -1.0, 1.0, 1.5]:
+		k.box(Vector3(0.45, 0.32, 0.32), Vector3(x, 0.36, 1.75), C_OLIVE_LT)
+	return k.build()
+
+func _mesh_scrapyard() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.box(Vector3(5.0, 0.08, 4.0), Vector3(0, 0.04, 0), C_DIRT)
+	for i in 11:
+		var x := -2.5 + i * 0.5
+		k.box(Vector3(0.08, 1.6, 0.08), Vector3(x, 0.8, -2.0), C_METAL)
+	for z in [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0]:
+		k.box(Vector3(0.08, 1.6, 0.08), Vector3(-2.5, 0.8, z), C_METAL)
+		k.box(Vector3(0.08, 1.6, 0.08), Vector3(2.5, 0.8, z), C_METAL)
+	k.box(Vector3(5.0, 0.05, 0.05), Vector3(0, 1.5, -2.0), C_WIRE)
+	k.box(Vector3(0.05, 0.05, 4.0), Vector3(-2.5, 1.5, 0), C_WIRE)
+	k.box(Vector3(0.05, 0.05, 4.0), Vector3(2.5, 1.5, 0), C_WIRE)
+	for p in [Vector3(-1.4, 0, -1.0), Vector3(0.6, 0, -1.2), Vector3(-0.3, 0, 0.6)]:
+		for j in 6:
+			k.box(Vector3(0.9 - j * 0.1, 0.25, 0.7), p + Vector3(randf_range(-0.2, 0.2), 0.15 + j * 0.2, randf_range(-0.2, 0.2)), [C_RUST, C_METAL, C_GUNMETAL][j % 3], Vector3(0, j * 0.7, 0.1))
+	k.box(Vector3(1.6, 1.9, 1.6), Vector3(1.5, 0.95, 0.9), C_WOOD)
+	k.box(Vector3(1.8, 0.1, 1.8), Vector3(1.5, 1.95, 0.9), C_RUST)
 	return k.build()
 
 func _mesh_fuel_tank() -> ArrayMesh:

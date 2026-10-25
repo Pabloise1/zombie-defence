@@ -44,7 +44,7 @@ func tick(dt: float) -> void:
 		var slot := _slot_for(z.position)
 		var from := slot.global_position
 		var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
-		z.hurt(Defs.SOLDIER_DAMAGE, from)
+		z.hurt(G.soldiers.damage(), from)
 		shots += 1
 		if G.fx:
 			G.fx.tracer(from, tp, 1)

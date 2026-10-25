@@ -265,7 +265,7 @@ func _shoot(dt: float) -> void:
 	var facing := to.length_squared() < 0.01 or fwd.dot(to.normalized()) > 0.9
 	if cd <= 0.0 and not _moving and facing:
 		cd = Defs.SOLDIER_INTERVAL * randf_range(0.85, 1.15)
-		fire_at(target, Defs.SOLDIER_DAMAGE)
+		fire_at(target, G.soldiers.damage())
 
 func fire_at(z, dmg: float, snd: String = "rifle") -> void:
 	var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), randf_range(-0.1, 0.1), randf_range(-0.15, 0.15))

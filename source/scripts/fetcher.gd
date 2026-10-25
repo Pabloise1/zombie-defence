@@ -126,6 +126,8 @@ func step(dt: float) -> void:
 				follow(dt, 3.2)
 			else:
 				if carrying > 0:
+					if G.buildings.count_built("scrapyard") > 0:
+						carrying = int(round(carrying * 1.5))
 					G.main.add_supplies(carrying)
 					G.logi.fetched += carrying
 					if G.sfx:

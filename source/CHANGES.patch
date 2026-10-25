@@ -1,7 +1,7 @@
 diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 --- a/scripts/art.gd	2026-10-24 19:02:37.756440030 +0000
-+++ b/scripts/art.gd	2026-10-25 01:02:11.725587118 +0000
-@@ -727,6 +727,22 @@
++++ b/scripts/art.gd	2026-10-25 01:16:18.253114839 +0000
+@@ -727,6 +727,42 @@
  			_mi(_cached("scrap_bundle", _mesh_scrap_bundle), mat_vc_metal, root, "Body")
  		"fetcher":
  			_build_worker(root, true)
@@ -21,10 +21,30 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +		"clinic":
 +			_mi(_cached("clinic", _mesh_clinic), mat_vc, root, "Body")
 +			_marker(root, "Door", Vector3(0, 0, 1.9))
++		"water_tower":
++			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
++			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
++			_marker(root, "Door", Vector3(0, 0, 2.2))
++		"container":
++			var cv := randi() % 4
++			_mi(_cached("container_%d" % cv, func(): return _mesh_container(cv)), mat_vc, root, "Body")
++			_marker(root, "RoofSlot1", Vector3(0, 2.62, 0))
++		"pillbox":
++			_mi(_cached("pillbox", _mesh_pillbox), mat_vc, root, "Body")
++			_marker(root, "Port1", Vector3(0, 1.15, -1.7))
++			_marker(root, "Port2", Vector3(1.7, 1.15, 0), -PI * 0.5)
++			_marker(root, "Port3", Vector3(-1.7, 1.15, 0), PI * 0.5)
++			_marker(root, "Door", Vector3(0, 0, 2.1))
++		"armory":
++			_mi(_cached("armory", _mesh_armory), mat_vc, root, "Body")
++			_marker(root, "Door", Vector3(0, 0, 1.9))
++		"scrapyard":
++			_mi(_cached("scrapyard", _mesh_scrapyard), mat_vc_metal, root, "Body")
++			_marker(root, "Door", Vector3(0, 0, 2.4))
  		_:
  			var k := MeshKit.new()
  			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
-@@ -846,6 +862,57 @@
+@@ -846,6 +882,143 @@
  	k.box(Vector3(0.6, 0.4, 0.5), Vector3(0.5, 0.45, 0.4), C_OLIVE)
  	return k.build()
  
@@ -79,12 +99,98 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +	k.box(Vector3(1.6, 0.08, 0.9), Vector3(0, 2.25, 1.85), white)
 +	return k.build()
 +
++func _mesh_water_tower() -> ArrayMesh:
++	var k := MeshKit.new()
++	for x in [-1.1, 1.1]:
++		for z in [-1.1, 1.1]:
++			k.box(Vector3(0.5, 0.3, 0.5), Vector3(x, 0.15, z), C_CONCRETE)
++			k.cyl(0.11, 0.14, 8.6, Vector3(x * 0.9, 4.4, z * 0.9), C_METAL, Vector3(-z * 0.03, 0, x * 0.03))
++	for y in [2.6, 5.4]:
++		for side in [Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(-1, 0, 0)]:
++			var along := Vector3(0, PI * 0.5, 0) if side.x != 0.0 else Vector3.ZERO
++			k.box(Vector3(2.0, 0.07, 0.07), Vector3(side.x, y, side.z) * Vector3(0.98, 1, 0.98), C_METAL, along)
++	k.cyl(1.35, 1.35, 1.9, Vector3(0, 9.6, 0), Color(0.55, 0.6, 0.62), Vector3.ZERO, 16)
++	k.cyl(1.45, 1.45, 0.12, Vector3(0, 8.65, 0), C_METAL, Vector3.ZERO, 16)
++	k.cyl(1.5, 1.5, 0.16, Vector3(0, 10.62, 0), C_CONCRETE_DK, Vector3.ZERO, 16)
++	for i in 10:
++		var a := i * TAU / 10.0
++		k.box(Vector3(0.55, 0.28, 0.3), Vector3(sin(a) * 1.3, 10.84, cos(a) * 1.3), C_FABRIC, Vector3(0, a, 0))
++	for j in 14:
++		k.box(Vector3(0.5, 0.05, 0.05), Vector3(0, 0.6 + j * 0.62, 1.12), C_METAL)
++	k.box(Vector3(0.05, 8.6, 0.05), Vector3(-0.25, 4.6, 1.12), C_METAL)
++	k.box(Vector3(0.05, 8.6, 0.05), Vector3(0.25, 4.6, 1.12), C_METAL)
++	return k.build()
++
++func _mesh_container(v: int) -> ArrayMesh:
++	var k := MeshKit.new()
++	var col: Color = [Color(0.55, 0.18, 0.12), Color(0.16, 0.32, 0.48), Color(0.3, 0.42, 0.2), Color(0.62, 0.5, 0.18)][v % 4]
++	var dk := col.darkened(0.3)
++	k.box(Vector3(6.0, 2.5, 2.4), Vector3(0, 1.3, 0), col)
++	for i in 13:
++		var x := -2.8 + i * 0.467
++		k.box(Vector3(0.08, 2.3, 2.46), Vector3(x, 1.3, 0), dk)
++	for x in [-2.98, 2.98]:
++		for z in [-1.18, 1.18]:
++			k.box(Vector3(0.14, 2.6, 0.14), Vector3(x, 1.3, z), C_METAL)
++	k.box(Vector3(0.06, 2.2, 1.0), Vector3(3.02, 1.3, -0.55), dk)
++	k.box(Vector3(0.06, 2.2, 1.0), Vector3(3.02, 1.3, 0.55), dk)
++	k.box(Vector3(0.04, 2.0, 0.06), Vector3(3.06, 1.3, -0.3), C_METAL)
++	k.box(Vector3(0.04, 2.0, 0.06), Vector3(3.06, 1.3, 0.3), C_METAL)
++	return k.build()
++
++func _mesh_pillbox() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.box(Vector3(3.3, 0.2, 3.3), Vector3(0, 0.1, 0), C_CONCRETE_DK)
++	k.box(Vector3(3.0, 0.8, 3.0), Vector3(0, 0.6, 0), C_CONCRETE)
++	k.box(Vector3(3.0, 0.22, 3.0), Vector3(0, 1.11, 0), C_DARK)
++	for p in [Vector3(0, 1.11, -1.38), Vector3(1.38, 1.11, 0), Vector3(-1.38, 1.11, 0), Vector3(0, 1.11, 1.38)]:
++		k.box(Vector3(0.5, 0.24, 0.5), p, C_CONCRETE)
++	k.box(Vector3(3.0, 0.5, 3.0), Vector3(0, 1.47, 0), C_CONCRETE)
++	k.box(Vector3(3.4, 0.25, 3.4), Vector3(0, 1.82, 0), C_CONCRETE_DK)
++	k.box(Vector3(0.9, 1.0, 0.06), Vector3(0, 0.6, 1.52), C_METAL)
++	for i in 8:
++		var a := i * TAU / 8.0
++		k.box(Vector3(0.7, 0.3, 0.4), Vector3(sin(a) * 1.25, 2.1, cos(a) * 1.25), C_FABRIC, Vector3(0, a, 0))
++	return k.build()
++
++func _mesh_armory() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.box(Vector3(4.1, 0.2, 3.1), Vector3(0, 0.1, 0), C_CONCRETE)
++	k.box(Vector3(3.8, 2.4, 2.8), Vector3(0, 1.4, 0), C_OLIVE)
++	k.prism(Vector3(3.1, 0.8, 4.0), Vector3(0, 3.0, 0), C_OLIVE_LT, Vector3(0, PI * 0.5, 0))
++	k.box(Vector3(1.4, 1.8, 0.06), Vector3(0, 1.1, 1.42), C_METAL)
++	k.box(Vector3(1.0, 0.5, 0.06), Vector3(0, 2.3, 1.42), C_SAND)
++	k.box(Vector3(0.7, 0.07, 0.07), Vector3(0, 2.3, 1.46), C_DARK, Vector3(0, 0, 0.6))
++	k.box(Vector3(0.7, 0.07, 0.07), Vector3(0, 2.3, 1.46), C_DARK, Vector3(0, 0, -0.6))
++	for x in [-1.5, -1.0, 1.0, 1.5]:
++		k.box(Vector3(0.45, 0.32, 0.32), Vector3(x, 0.36, 1.75), C_OLIVE_LT)
++	return k.build()
++
++func _mesh_scrapyard() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.box(Vector3(5.0, 0.08, 4.0), Vector3(0, 0.04, 0), C_DIRT)
++	for i in 11:
++		var x := -2.5 + i * 0.5
++		k.box(Vector3(0.08, 1.6, 0.08), Vector3(x, 0.8, -2.0), C_METAL)
++	for z in [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0]:
++		k.box(Vector3(0.08, 1.6, 0.08), Vector3(-2.5, 0.8, z), C_METAL)
++		k.box(Vector3(0.08, 1.6, 0.08), Vector3(2.5, 0.8, z), C_METAL)
++	k.box(Vector3(5.0, 0.05, 0.05), Vector3(0, 1.5, -2.0), C_WIRE)
++	k.box(Vector3(0.05, 0.05, 4.0), Vector3(-2.5, 1.5, 0), C_WIRE)
++	k.box(Vector3(0.05, 0.05, 4.0), Vector3(2.5, 1.5, 0), C_WIRE)
++	for p in [Vector3(-1.4, 0, -1.0), Vector3(0.6, 0, -1.2), Vector3(-0.3, 0, 0.6)]:
++		for j in 6:
++			k.box(Vector3(0.9 - j * 0.1, 0.25, 0.7), p + Vector3(randf_range(-0.2, 0.2), 0.15 + j * 0.2, randf_range(-0.2, 0.2)), [C_RUST, C_METAL, C_GUNMETAL][j % 3], Vector3(0, j * 0.7, 0.1))
++	k.box(Vector3(1.6, 1.9, 1.6), Vector3(1.5, 0.95, 0.9), C_WOOD)
++	k.box(Vector3(1.8, 0.1, 1.8), Vector3(1.5, 1.95, 0.9), C_RUST)
++	return k.build()
++
  func _mesh_fuel_tank() -> ArrayMesh:
  	var k := MeshKit.new()
  	k.box(Vector3(0.2, 0.5, 1.2), Vector3(-0.6, 0.25, 0), C_WOOD_DK)
 diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
 --- a/scripts/building.gd	2026-10-24 19:02:37.754757495 +0000
-+++ b/scripts/building.gd	2026-10-25 01:02:43.620168615 +0000
++++ b/scripts/building.gd	2026-10-25 01:26:55.134913219 +0000
 @@ -22,6 +22,8 @@
  var reserve := 0
  var reserve_max := 0
@@ -106,6 +212,15 @@ diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
  	_on_model_ready()
  	if host == null and not rect:
  		_apply_rest()
+@@ -353,7 +360,7 @@
+ 				bd = dd
+ 				from = p
+ 		var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
+-		z.hurt(Defs.SOLDIER_DAMAGE, from)
++		z.hurt(G.soldiers.damage(), from)
+ 		if s.visible:
+ 			s.face_point(z.position)
+ 			s._fire_t = 0.22
 @@ -446,7 +453,9 @@
  	return true
  
@@ -227,6 +342,18 @@ diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
  func is_wallish() -> bool:
  	return rect
  
+diff -ruN src_orig/scripts/buildings/garrison.gd src/scripts/buildings/garrison.gd
+--- a/scripts/buildings/garrison.gd	2026-10-24 19:02:37.755210274 +0000
++++ b/scripts/buildings/garrison.gd	2026-10-25 01:26:55.135113369 +0000
+@@ -44,7 +44,7 @@
+ 		var slot := _slot_for(z.position)
+ 		var from := slot.global_position
+ 		var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), 0, randf_range(-0.15, 0.15))
+-		z.hurt(Defs.SOLDIER_DAMAGE, from)
++		z.hurt(G.soldiers.damage(), from)
+ 		shots += 1
+ 		if G.fx:
+ 			G.fx.tracer(from, tp, 1)
 diff -ruN src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
 --- a/scripts/buildings/hq.gd	2026-10-24 19:02:37.755353206 +0000
 +++ b/scripts/buildings/hq.gd	2026-10-24 20:04:23.514861008 +0000
@@ -241,7 +368,7 @@ diff -ruN src_orig/scripts/buildings/hq.gd src/scripts/buildings/hq.gd
  		var can_plus := idle > 0
 diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
 --- a/scripts/buildings/prefab.gd	2026-10-24 19:02:37.755256490 +0000
-+++ b/scripts/buildings/prefab.gd	2026-10-25 01:01:08.800913104 +0000
++++ b/scripts/buildings/prefab.gd	2026-10-25 01:26:55.135461627 +0000
 @@ -41,6 +41,14 @@
  	if state != BUILT:
  		return
@@ -257,7 +384,7 @@ diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
  	if kind == "barracks":
  		_heal_t -= dt
  		if _heal_t <= 0.0:
-@@ -67,6 +75,10 @@
+@@ -67,6 +75,14 @@
  			out.append("Crafters %d/%d  ·  %d supplies make 1 crate" % [n, Defs.CRAFTERS_PER_WORKSHOP, Defs.CRATE_COST])
  		"watchtower":
  			out.append("Roof gun +%d%% range" % int(slot_bonus() * 100.0))
@@ -265,6 +392,10 @@ diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
 +			out.append("+%d supplies after every wave it survives" % int(def.get("income", 0)))
 +		"clinic":
 +			out.append("Heals people and soldiers within %d m" % int(def.get("heal_range", 14.0)))
++		"armory":
++			out.append("All soldiers do +25%% damage (%.0f a shot)" % G.soldiers.damage())
++		"scrapyard":
++			out.append("Fetchers' hauls +50%  ·  scrap piles refill twice as fast")
  		_:
  			out.append(String(def.get("about", "")))
  	var free := 0
@@ -494,7 +625,7 @@ diff -ruN src_orig/scripts/civilian.gd src/scripts/civilian.gd
 +	_plan_refuge()
 diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
-+++ b/scripts/defs.gd	2026-10-25 01:02:43.619696974 +0000
++++ b/scripts/defs.gd	2026-10-25 01:26:55.134172893 +0000
 @@ -24,7 +24,7 @@
  const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
  const START_CRATES := 6
@@ -504,7 +635,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const CRAFT_TIME := 8.0
  const CRAFTERS_PER_WORKSHOP := 2
  const FETCH_LOAD := 25
-@@ -224,18 +224,79 @@
+@@ -224,18 +224,105 @@
  		"ground": true, "trench": false, "line": true, "model": "",
  		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
  	},
@@ -537,6 +668,31 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 +		"name": "Clinic", "long": "Clinic", "cost": 130, "time": 20.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
 +		"prefab": true, "half": Vector2(2.0, 1.5), "model": "clinic", "unlock": 3, "heal": 5.0, "heal_range": 14.0,
 +		"hint": "Drag it, turn the handle, then tick", "about": "Heals everyone within 14 m",
++	},
++	"water_tower": {
++		"name": "Water Tw", "long": "Water Tower", "cost": 200, "time": 22.0, "hp": 2200.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.5, 1.5), "model": "water_tower", "slot_bonus": 0.8, "unlock": 4,
++		"hint": "Drag it, turn the handle, then tick", "about": "11 m perch: its gun gets +80% range",
++	},
++	"container": {
++		"name": "Container", "long": "Shipping Container", "cost": 70, "time": 10.0, "hp": 3500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(3.0, 1.25), "model": "container", "slot_bonus": 0.25, "unlock": 2,
++		"hint": "Drag it, turn the handle, then tick", "about": "Steel box fort piece  ·  1 roof gun slot",
++	},
++	"pillbox": {
++		"name": "Pillbox", "long": "Concrete Pillbox", "cost": 140, "time": 16.0, "hp": 4500.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(1.6, 1.6), "model": "pillbox", "capacity": 3, "unlock": 3,
++		"hint": "Drag it, turn the handle, then tick", "about": "3 soldiers fire from the slits  ·  very tough",
++	},
++	"armory": {
++		"name": "Armory", "long": "Armory", "cost": 160, "time": 20.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.0, 1.5), "model": "armory", "unlock": 4,
++		"hint": "Drag it, turn the handle, then tick", "about": "All soldiers do +25% damage",
++	},
++	"scrapyard": {
++		"name": "Scrapyard", "long": "Scrapyard", "cost": 110, "time": 16.0, "hp": 1600.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.5, 2.0), "model": "scrapyard", "unlock": 2,
++		"hint": "Drag it, turn the handle, then tick", "about": "Fetchers' hauls +50%  ·  scrap piles refill faster",
 +	},
 +	"lamp": {
 +		"name": "Lamp", "long": "Street Lamp", "cost": 10, "time": 2.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
@@ -573,11 +729,12 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
 -	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire"]},
 -	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower"]},
-+	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
-+	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic"]},
- 	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large"]},
+-	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large"]},
 -	{"id": "supply", "name": "Supply", "tools": ["ammo_point", "radio", "fuel"]},
 -	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "remove"]},
++	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
++	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
++	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 +	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 +	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
  ]
@@ -585,21 +742,22 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
 -	"ammo_point", "radio", "fuel", "spikes", "mine", "dig"]
 +	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
-+	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline"]
++	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
++	"water_tower", "container", "pillbox", "armory", "scrapyard"]
  const MAP_BUILDINGS := {
  	"house_two_storey": {
  		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
-@@ -268,7 +329,8 @@
+@@ -268,7 +355,8 @@
  	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
  	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
  ]
 -const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large"]
 +const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
-+	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic"]
++	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard"]
  const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
  const SOLDIER_MAX := 40
  const SOLDIER_HP := 70.0
-@@ -301,6 +363,7 @@
+@@ -301,6 +389,7 @@
  const Z_RUNNER := 1
  const Z_BRUTE := 2
  const REFUND_BUILT := 0.5
@@ -609,7 +767,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const Z_HP := [33.0, 23.0, 330.0]
 diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
 --- a/scripts/fetcher.gd	2026-10-24 19:02:37.756064080 +0000
-+++ b/scripts/fetcher.gd	2026-10-24 20:04:23.514436284 +0000
++++ b/scripts/fetcher.gd	2026-10-25 01:15:43.088363045 +0000
 @@ -1,6 +1,6 @@
  class_name Fetcher
  extends Person
@@ -685,7 +843,16 @@ diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
  				var s = G.logi.pick_salvage(position) if G.logi else null
  				if s != null:
  					var goals: Dictionary = s.goals()
-@@ -111,6 +134,28 @@
+@@ -103,6 +126,8 @@
+ 				follow(dt, 3.2)
+ 			else:
+ 				if carrying > 0:
++					if G.buildings.count_built("scrapyard") > 0:
++						carrying = int(round(carrying * 1.5))
+ 					G.main.add_supplies(carrying)
+ 					G.logi.fetched += carrying
+ 					if G.sfx:
+@@ -111,6 +136,28 @@
  				_bundle.visible = false
  				mode = IDLE
  				_think = 0.5
@@ -714,7 +881,7 @@ diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
  		FLEE:
  			_bundle.visible = false
  			carrying = 0
-@@ -122,7 +167,7 @@
+@@ -122,7 +169,7 @@
  		anim_mode = "work"
  	elif mode == CARRY:
  		anim_mode = "carry"
@@ -749,7 +916,7 @@ diff -ruN src_orig/scripts/g.gd src/scripts/g.gd
  	main = null
 diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
 --- a/scripts/logistics.gd	2026-10-24 19:02:37.755636605 +0000
-+++ b/scripts/logistics.gd	2026-10-24 19:07:05.109941219 +0000
++++ b/scripts/logistics.gd	2026-10-25 01:15:43.088773696 +0000
 @@ -4,6 +4,7 @@
  var hq_crates := 0
  var crafted := 0
@@ -785,6 +952,15 @@ diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
  func nearest_with_crates(p: Vector3, exclude = null):
  	var best = null
  	var bd := INF
+@@ -143,6 +164,7 @@
+ 	return best
+ 
+ func on_wave_cleared() -> void:
++	var regrow := 40 if G.buildings.count_built("scrapyard") > 0 else 20
+ 	for s in salvage:
+-		s.scrap = mini(s.scrap_max, s.scrap + 20)
++		s.scrap = mini(s.scrap_max, s.scrap + regrow)
+ 		s.refresh()
 diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
 +++ b/scripts/main.gd	2026-10-25 01:01:08.801182221 +0000
@@ -1873,6 +2049,43 @@ diff -ruN src_orig/scripts/save_game.gd src/scripts/save_game.gd
 +	for j in jobs:
 +		for i in int(jobs[j]):
 +			p.add_job(j)
+diff -ruN src_orig/scripts/soldier.gd src/scripts/soldier.gd
+--- a/scripts/soldier.gd	2026-10-24 19:02:37.756503665 +0000
++++ b/scripts/soldier.gd	2026-10-25 01:26:55.135287498 +0000
+@@ -265,7 +265,7 @@
+ 	var facing := to.length_squared() < 0.01 or fwd.dot(to.normalized()) > 0.9
+ 	if cd <= 0.0 and not _moving and facing:
+ 		cd = Defs.SOLDIER_INTERVAL * randf_range(0.85, 1.15)
+-		fire_at(target, Defs.SOLDIER_DAMAGE)
++		fire_at(target, G.soldiers.damage())
+ 
+ func fire_at(z, dmg: float, snd: String = "rifle") -> void:
+ 	var tp: Vector3 = z.aim_point() + Vector3(randf_range(-0.15, 0.15), randf_range(-0.1, 0.1), randf_range(-0.15, 0.15))
+diff -ruN src_orig/scripts/soldier_manager.gd src/scripts/soldier_manager.gd
+--- a/scripts/soldier_manager.gd	2026-10-24 19:02:37.755738521 +0000
++++ b/scripts/soldier_manager.gd	2026-10-25 01:26:55.134606151 +0000
+@@ -32,6 +32,12 @@
+ 	soldiers.erase(s)
+ 	changed.emit()
+ 
++# Rifle damage, with the Armory bonus.
++func damage() -> float:
++	if G.buildings and G.buildings.count_built("armory") > 0:
++		return Defs.SOLDIER_DAMAGE * 1.25
++	return Defs.SOLDIER_DAMAGE
++
+ func idle_soldiers() -> Array:
+ 	var out := []
+ 	for s in soldiers:
+@@ -308,7 +314,7 @@
+ 				if z.kind == Defs.Z_BRUTE:
+ 					score -= 9.0
+ 				var others: int = z.aimed - (1 if z == current else 0)
+-				if others > 0 and z.hp <= others * Defs.SOLDIER_DAMAGE:
++				if others > 0 and z.hp <= others * damage():
+ 					score += 12.0
+ 				else:
+ 					score += others * 2.5
 diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
 --- a/scripts/ui/card_models.gd	2026-10-24 19:02:37.754539227 +0000
 +++ b/scripts/ui/card_models.gd	2026-10-25 00:34:49.176645065 +0000
@@ -2003,20 +2216,21 @@ diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
  	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
 diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
-+++ b/scripts/ui/icons.gd	2026-10-25 01:01:08.801470474 +0000
-@@ -1,7 +1,11 @@
++++ b/scripts/ui/icons.gd	2026-10-25 01:16:18.237998690 +0000
+@@ -1,7 +1,12 @@
  class_name Icons
  extends RefCounted
  
 +const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
-+	"clinic": "heart", "lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
++	"clinic": "heart", "water_tower": "watchtower", "container": "depot", "pillbox": "garrison", "armory": "soldier", "scrapyard": "supplies",
++	"lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
 +
  static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:
 +	kind = ALIAS.get(kind, kind)
  	var c := r.get_center()
  	var s := minf(r.size.x, r.size.y)
  	match kind:
-@@ -334,7 +338,9 @@
+@@ -334,7 +339,9 @@
  			return "hammer"
  		"expand":
  			return "expand"
