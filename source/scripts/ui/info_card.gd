@@ -183,7 +183,8 @@ func _icon_kind() -> String:
 func _draw_row(row: Array, x: float, y: float, w: float) -> void:
 	var job: String = row[0]
 	var bsz := 48.0
-	var jicon: String = {"worker": "hammer", "soldier": "soldier", "loader": "crate", "fetcher": "supplies", "crafter": "workshop"}.get(job, "person")
+	var jicon: String = {"worker": "hammer", "soldier": "soldier", "loader": "crate", "fetcher": "supplies", "crafter": "workshop",
+		"zspeed": "zombie", "horde": "zombie", "spawn": "clock"}.get(job, "person")
 	Icons.draw(self, jicon, Rect2(x, y + 8.0, 22.0, 22.0), Hud.ACCENT)
 	draw_string(Hud.font_heavy, Vector2(x + 30.0, y + 24), String(row[1]), HORIZONTAL_ALIGNMENT_LEFT, w * 0.45, 16, Hud.TEXT)
 	draw_string(Hud.font_bold, Vector2(x + 30.0, y + 42), String(row[5]), HORIZONTAL_ALIGNMENT_LEFT, w * 0.5, 12, Hud.MUTED)

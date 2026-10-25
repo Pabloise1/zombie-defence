@@ -102,8 +102,6 @@ class Settings:
 		var out := []
 		if G.main and G.main.quality:
 			out.append("Graphics: %s  ·  %s" % [G.main.quality.label(), G.main.quality.fps_label()])
-		if G.main:
-			out.append("Zombies: speed %d%%  ·  horde %d%%" % [int(round(G.main.zombie_speed * 100.0)), int(round(G.main.horde_mult * 100.0))])
 		out.append_array(Array(diagnostic().split("\n")))
 		return out
 	func card_buttons() -> Array:
@@ -112,12 +110,18 @@ class Settings:
 		if G.main and G.main.quality:
 			q = QualityManager.MODE_NAMES[G.main.quality.mode].to_upper()
 			f = str(G.main.quality.fps_cap) if G.main.quality.fps_cap > 0 else "MAX"
-		var zs := 100
-		var hm := 100
-		if G.main:
-			zs = int(round(G.main.zombie_speed * 100.0))
-			hm = int(round(G.main.horde_mult * 100.0))
-		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["zspeed", "SPEED: %d%%" % zs, true], ["horde", "HORDE: %d%%" % hm, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
+		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
+	# Zombie difficulty: - / + rows, shown as % of normal.
+	func card_rows() -> Array:
+		var out := []
+		if G.main == null:
+			return out
+		for r in [["zspeed", "Zombie speed", "% speed"], ["horde", "Horde size", "% zombies a wave"], ["spawn", "Spawn rate", "% how fast they pour in"]]:
+			var v: float = G.main.game_setting(r[0])
+			var ch: Array = G.main.setting_choices(r[0])
+			var i := ch.find(v)
+			out.append([r[0], r[1], int(round(v * 100.0)), i > 0, i < ch.size() - 1, r[2]])
+		return out
 
 class Ask:
 	extends RefCounted

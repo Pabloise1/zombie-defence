@@ -196,6 +196,9 @@ func check_rect(kind: String, p: Vector3, yaw: float, ignore = null, cut: Array 
 	var edge := Defs.HALF - 4.0
 	if absf(p.x) > edge or absf(p.z) > edge:
 		return "Too close to the edge"
+	var d: Dictionary = Defs.BUILD[kind]
+	if d.has("site_range") and site_near(p, float(d["site_range"])) == null:
+		return "Build it next to a scrap site"
 	var fp := rect_of(kind, p, yaw)
 	var g: Grid = G.grid
 	for c in fp["cells"]:
@@ -332,6 +335,19 @@ func move_building(b, p: Vector3, yaw: float) -> String:
 	last_placed = nb
 	changed.emit()
 	return ""
+
+# The scrap site (wreck or ruin) nearest p within r, or null.
+func site_near(p: Vector3, r: float):
+	var best = null
+	var bd := r
+	if G.logi:
+		for s in G.logi.salvage:
+			if is_instance_valid(s):
+				var dd: float = Vector2(s.position.x - p.x, s.position.z - p.z).length()
+				if dd < bd:
+					bd = dd
+					best = s
+	return best
 
 func mount(host, i: int, kind: String, pay: bool = true, built: bool = false) -> Building:
 	if host == null or not is_instance_valid(host) or i < 0 or i >= host.mounted.size():

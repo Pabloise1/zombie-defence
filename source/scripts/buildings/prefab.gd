@@ -79,6 +79,10 @@ func card_lines() -> Array:
 			out.append("+%d supplies after every wave it survives" % int(def.get("income", 0)))
 		"clinic":
 			out.append("Heals people and soldiers within %d m" % int(def.get("heal_range", 14.0)))
+		"outpost":
+			var site = G.buildings.site_near(position, float(def.get("site_range", 14.0)))
+			out.append("+%d supplies a wave, plus up to %d scrap from the site (%d left)" % [int(def.get("income", 0)), int(def.get("scrap_take", 40)), site.scrap if site else 0])
+			out.append("Zombies go for it like the HQ: wall it in")
 		"armory":
 			out.append("All soldiers do +25%% damage (%.0f a shot)" % G.soldiers.damage())
 		"scrapyard":

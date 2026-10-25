@@ -287,6 +287,12 @@ const BUILD := {
 		"prefab": true, "half": Vector2(1.6, 1.6), "model": "pillbox", "capacity": 3, "unlock": 3,
 		"hint": "Drag it, turn the handle, then tick", "about": "3 soldiers fire from the slits  ·  very tough",
 	},
+	"outpost": {
+		"name": "Outpost", "long": "Scavenger Outpost", "cost": 120, "time": 12.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(2.0, 2.0), "model": "outpost", "capacity": 2, "slot_bonus": 0.2, "unlock": 2,
+		"site_range": 14.0, "income": 40, "scrap_take": 40, "goal": true,
+		"hint": "Drag it next to a scrap site, turn the handle, then tick", "about": "Income every wave  ·  zombies go for it",
+	},
 	"armory": {
 		"name": "Armory", "long": "Armory", "cost": 160, "time": 20.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
 		"prefab": true, "half": Vector2(2.0, 1.5), "model": "armory", "unlock": 4,
@@ -331,7 +337,7 @@ const BUILD := {
 const TABS := [
 	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]},
 	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
-	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
+	{"id": "base", "name": "Buildings", "tools": ["outpost", "house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
 	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
@@ -340,7 +346,7 @@ const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon", "co
 	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
 	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
 	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
-	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete"]
+	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete", "outpost"]
 const MAP_BUILDINGS := {
 	"house_two_storey": {
 		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
@@ -374,7 +380,7 @@ const MAPS := [
 	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
 ]
 const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
-	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard"]
+	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard", "outpost"]
 const GUNS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]
 const SOLDIER_MAX := 40
 const SOLDIER_HP := 70.0

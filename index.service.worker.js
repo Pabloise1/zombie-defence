@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1792913506|37007804';
+const CACHE_VERSION = '1792914218|37012252';
 /** @type {string} */
 const CACHE_PREFIX = 'Zombie Defence-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;

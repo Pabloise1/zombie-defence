@@ -29,10 +29,12 @@ var waves_cleared := 0
 var repair_spent := 0
 var map_seed := 0
 # Player difficulty settings (Settings card), kept in settings.cfg.
-const SPEED_CHOICES := [0.75, 1.0, 1.25, 1.5]
-const HORDE_CHOICES := [0.5, 0.75, 1.0, 1.5, 2.0]
+const SPEED_CHOICES := [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]
+const HORDE_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+const SPAWN_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
 var zombie_speed := 1.0
 var horde_mult := 1.0
+var spawn_rate := 1.0
 var _save_t := 0.0
 var test_mode := false
 var manual_clock := false
@@ -1059,6 +1061,11 @@ func _on_tool_pressed(t: String) -> void:
 	builder.set_tool(t)
 
 func _on_card_action(id: String, target) -> void:
+	if id.begins_with("plus:") or id.begins_with("minus:"):
+		var key := id.get_slice(":", 1)
+		if key in ["zspeed", "horde", "spawn"]:
+			_step_setting(key, 1 if id.begins_with("plus:") else -1)
+			return
 	if id.begins_with("plus:"):
 		var job := id.substr(5)
 		var why: String = people.add_job(job)
@@ -1190,16 +1197,6 @@ func _on_card_action(id: String, target) -> void:
 			quality.next_mode()
 			_ui("ui_tap")
 			hud.toast("Graphics: %s" % quality.label())
-		"zspeed":
-			zombie_speed = _next_choice(SPEED_CHOICES, zombie_speed)
-			_save_game_settings()
-			_ui("ui_tap")
-			hud.toast("Zombie speed %d%%  ·  new zombies from now on" % int(round(zombie_speed * 100.0)))
-		"horde":
-			horde_mult = _next_choice(HORDE_CHOICES, horde_mult)
-			_save_game_settings()
-			_ui("ui_tap")
-			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
 		"raise":
 			_card_result(target.raise_one(), "Workers will add a floor")
 		"raise_all":
@@ -1295,8 +1292,10 @@ func _load_game_settings() -> void:
 	if cf.load(QualityManager.SETTINGS_PATH) == OK:
 		var sp := float(cf.get_value("game", "zombie_speed", 1.0))
 		var hm := float(cf.get_value("game", "horde", 1.0))
+		var sr := float(cf.get_value("game", "spawn_rate", 1.0))
 		zombie_speed = sp if SPEED_CHOICES.has(sp) else 1.0
 		horde_mult = hm if HORDE_CHOICES.has(hm) else 1.0
+		spawn_rate = sr if SPAWN_CHOICES.has(sr) else 1.0
 
 func _save_game_settings() -> void:
 	if test_mode:
@@ -1305,11 +1304,46 @@ func _save_game_settings() -> void:
 	cf.load(QualityManager.SETTINGS_PATH)
 	cf.set_value("game", "zombie_speed", zombie_speed)
 	cf.set_value("game", "horde", horde_mult)
+	cf.set_value("game", "spawn_rate", spawn_rate)
 	cf.save(QualityManager.SETTINGS_PATH)
 
-static func _next_choice(choices: Array, v: float) -> float:
+static func _step_choice(choices: Array, v: float, step: int) -> float:
 	var i := choices.find(v)
-	return choices[(i + 1) % choices.size()]
+	if i < 0:
+		i = choices.find(1.0)
+	return choices[clampi(i + step, 0, choices.size() - 1)]
+
+func game_setting(key: String) -> float:
+	match key:
+		"zspeed":
+			return zombie_speed
+		"horde":
+			return horde_mult
+		"spawn":
+			return spawn_rate
+	return 1.0
+
+func setting_choices(key: String) -> Array:
+	match key:
+		"zspeed":
+			return SPEED_CHOICES
+		"horde":
+			return HORDE_CHOICES
+	return SPAWN_CHOICES
+
+func _step_setting(key: String, step: int) -> void:
+	var v := _step_choice(setting_choices(key), game_setting(key), step)
+	match key:
+		"zspeed":
+			zombie_speed = v
+		"horde":
+			horde_mult = v
+		"spawn":
+			spawn_rate = v
+	_save_game_settings()
+	_ui("ui_tap")
+	var when := "new zombies from now on" if key == "zspeed" else "from the next wave"
+	hud.toast("%s %d%%  ·  %s" % [{"zspeed": "Zombie speed", "horde": "Horde size", "spawn": "Spawn rate"}[key], int(round(v * 100.0)), when])
 
 func _plan_edges() -> void:
 	var n := 1
@@ -1359,7 +1393,7 @@ func start_wave() -> void:
 	var duration := 22.0 + wave * 4.0
 	if wave == 1:
 		duration = 40.0
-	_spawn_gap = maxf(0.12, duration / count)
+	_spawn_gap = maxf(0.03, duration / count / spawn_rate)
 	_spawn_t = 0.5
 	var sub := "From the %s" % _edge_text()
 	if brutes > 0:
@@ -1422,10 +1456,18 @@ func _wave_cleared() -> void:
 	var farm := 0
 	for b in buildings.built_of("greenhouse"):
 		farm += int(b.def.get("income", 0))
-	add_supplies(bonus + farm)
-	var sub := "+%d supplies" % (bonus + farm)
+	var post := 0
+	for b in buildings.built_of("outpost"):
+		post += int(b.def.get("income", 0))
+		var site = buildings.site_near(b.position, float(b.def.get("site_range", 14.0)))
+		if site != null:
+			post += site.take(int(b.def.get("scrap_take", 40)))
+	add_supplies(bonus + farm + post)
+	var sub := "+%d supplies" % (bonus + farm + post)
 	if farm > 0:
 		sub += " (%d from farms)" % farm
+	if post > 0:
+		sub += " (%d from outposts)" % post
 	if people.saved_wave > 0:
 		sub += "  ·  %d saved" % people.saved_wave
 	if people.lost_wave > 0:
@@ -1440,6 +1482,8 @@ func _wave_cleared() -> void:
 	_plan_edges()
 	if wave == 3 and buildings.count_built("workshop") == 0:
 		hud.toast("Guns use up ammo crates. Build a Workshop and add Crafters")
+	if wave == 2:
+		hud.toast("Outposts: build one by a scrap site for income. Zombies will go for it")
 	for t in Defs.TOOLS:
 		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
 			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))

@@ -72,7 +72,11 @@ func is_busy() -> bool:
 # just obstacles that cost something to break through, so the horde takes
 # the cheapest way in: round through a gap, or through the weakest wall.
 func _is_goal(i: int, owner) -> bool:
-	return grid.hq_nav.has(i) or (owner is Building and is_instance_valid(owner) and owner.def.has("lure"))
+	if grid.hq_nav.has(i):
+		return true
+	if owner is Building and is_instance_valid(owner) and owner.state == Building.BUILT:
+		return owner.def.has("lure") or bool(owner.def.get("goal", false))
+	return false
 
 func _goal_dist(owner) -> float:
 	if owner is Building and is_instance_valid(owner) and owner.def.has("lure"):

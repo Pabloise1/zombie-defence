@@ -1,6 +1,6 @@
 diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 --- a/scripts/art.gd	2026-10-24 19:02:37.756440030 +0000
-+++ b/scripts/art.gd	2026-10-25 06:33:22.583759280 +0000
++++ b/scripts/art.gd	2026-10-25 07:40:28.745604184 +0000
 @@ -578,6 +578,22 @@
  			muzzle.name = "Muzzle"
  			muzzle.position = Vector3(0, 0, -1.12)
@@ -24,7 +24,7 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
  		"spike_trap":
  			_mi(_cached("spike_base", _mesh_spike_base), mat_vc, root, "Base")
  			var sp := Node3D.new()
-@@ -727,6 +743,45 @@
+@@ -727,6 +743,51 @@
  			_mi(_cached("scrap_bundle", _mesh_scrap_bundle), mat_vc_metal, root, "Body")
  		"fetcher":
  			_build_worker(root, true)
@@ -47,6 +47,12 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +		"fort_wood", "fort_concrete":
 +			_mi(fort_module_mesh(kind == "fort_concrete", [0], 15), mat_vc, root, "Body")
 +			_marker(root, "RoofSlot1", Vector3(0, 3.25, 0))
++		"outpost":
++			_mi(_cached("outpost", _mesh_outpost), mat_vc, root, "Body")
++			_marker(root, "RoofSlot1", Vector3(1.1, 1.62, -1.1))
++			_marker(root, "Port1", Vector3(-1.9, 1.1, -0.6), PI * 0.5)
++			_marker(root, "Port2", Vector3(0.6, 1.1, 1.9), PI)
++			_marker(root, "Door", Vector3(-1.0, 0, 2.4))
 +		"water_tower":
 +			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
 +			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
@@ -70,7 +76,7 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
  		_:
  			var k := MeshKit.new()
  			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
-@@ -846,6 +901,202 @@
+@@ -846,6 +907,226 @@
  	k.box(Vector3(0.6, 0.4, 0.5), Vector3(0.5, 0.45, 0.4), C_OLIVE)
  	return k.build()
  
@@ -182,6 +188,30 @@ diff -ruN src_orig/scripts/art.gd src/scripts/art.gd
 +	k.cyl(0.11, 0.13, 1.6, Vector3(0, 0, -0.9), C_GUNMETAL, Vector3(PI * 0.5, 0, 0), 10)
 +	k.cyl(0.17, 0.17, 0.32, Vector3(0, 0, -1.6), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
 +	k.cyl(0.2, 0.2, 0.35, Vector3(0, 0, -0.08), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
++	return k.build()
++
++func _mesh_outpost() -> ArrayMesh:
++	var k := MeshKit.new()
++	k.box(Vector3(4.2, 0.1, 4.2), Vector3(0, 0.05, 0), C_DIRT)
++	for i in 7:
++		var t := -1.8 + i * 0.6
++		k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.26, -1.9), C_FABRIC)
++		k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.58, -1.9), C_FABRIC)
++		k.box(Vector3(0.4, 0.32, 0.58), Vector3(-1.9, 0.26, t), C_FABRIC)
++		k.box(Vector3(0.4, 0.32, 0.58), Vector3(-1.9, 0.58, t), C_FABRIC)
++		k.box(Vector3(0.4, 0.32, 0.58), Vector3(1.9, 0.26, t), C_FABRIC)
++		if i > 2:
++			k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.26, 1.9), C_FABRIC)
++			k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.58, 1.9), C_FABRIC)
++	k.prism(Vector3(2.0, 1.4, 2.2), Vector3(-0.6, 0.8, 0.4), C_OLIVE, Vector3(0, PI * 0.5, 0))
++	for p in [Vector3(0.6, 0, -0.4), Vector3(0.9, 0, 0.3)]:
++		k.box(Vector3(0.5, 0.36, 0.36), p + Vector3(0, 0.28, 0), C_OLIVE_LT)
++	for x in [0.5, 1.7]:
++		for z in [-1.7, -0.5]:
++			k.box(Vector3(0.12, 1.5, 0.12), Vector3(x, 0.75, z), C_WOOD)
++	k.box(Vector3(1.5, 0.12, 1.5), Vector3(1.1, 1.5, -1.1), C_WOOD_DK)
++	k.cyl(0.04, 0.05, 4.2, Vector3(-1.6, 2.1, 1.6), C_METAL)
++	k.box(Vector3(0.8, 0.5, 0.03), Vector3(-1.2, 3.9, 1.6), Color(0.85, 0.65, 0.12))
 +	return k.build()
 +
 +func _mesh_water_tower() -> ArrayMesh:
@@ -441,7 +471,7 @@ diff -ruN src_orig/scripts/building.gd src/scripts/building.gd
  
 diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
 --- a/scripts/building_manager.gd	2026-10-24 19:02:37.756247153 +0000
-+++ b/scripts/building_manager.gd	2026-10-25 07:00:20.137056476 +0000
++++ b/scripts/building_manager.gd	2026-10-25 07:40:28.743177588 +0000
 @@ -29,11 +29,15 @@
  			return StairsTower.new()
  		"helipad", "helipad_large":
@@ -491,7 +521,17 @@ diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
  	var b := _make(kind)
  	add_child(b)
  	for cc in _footprint(kind, c):
-@@ -195,7 +204,7 @@
+@@ -187,6 +196,9 @@
+ 	var edge := Defs.HALF - 4.0
+ 	if absf(p.x) > edge or absf(p.z) > edge:
+ 		return "Too close to the edge"
++	var d: Dictionary = Defs.BUILD[kind]
++	if d.has("site_range") and site_near(p, float(d["site_range"])) == null:
++		return "Build it next to a scrap site"
+ 	var fp := rect_of(kind, p, yaw)
+ 	var g: Grid = G.grid
+ 	for c in fp["cells"]:
+@@ -195,7 +207,7 @@
  		var i := g.idx(c)
  		if g.is_hq(c):
  			return "That's the HQ"
@@ -500,7 +540,7 @@ diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
  			return "Blocked"
  		if g.is_trench(c) or g.digs[i] != null:
  			return "Not on a trench"
-@@ -204,7 +213,7 @@
+@@ -204,7 +216,7 @@
  			return "Something's in the way"
  	for ni in fp["nav"]:
  		var b := g.nblk[ni]
@@ -509,7 +549,7 @@ diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
  			continue
  		var own = g.nown[ni]
  		if own != null and (own == ignore or cut.has(own)):
-@@ -253,6 +262,7 @@
+@@ -253,6 +265,7 @@
  		return null
  	_order += 1
  	var fp := rect_of(kind, p, yaw)
@@ -517,6 +557,26 @@ diff -ruN src_orig/scripts/building_manager.gd src/scripts/building_manager.gd
  	var b := _make(kind)
  	add_child(b)
  	for c in fp["cells"]:
+@@ -323,6 +336,19 @@
+ 	changed.emit()
+ 	return ""
+ 
++# The scrap site (wreck or ruin) nearest p within r, or null.
++func site_near(p: Vector3, r: float):
++	var best = null
++	var bd := r
++	if G.logi:
++		for s in G.logi.salvage:
++			if is_instance_valid(s):
++				var dd: float = Vector2(s.position.x - p.x, s.position.z - p.z).length()
++				if dd < bd:
++					bd = dd
++					best = s
++	return best
++
+ func mount(host, i: int, kind: String, pay: bool = true, built: bool = false) -> Building:
+ 	if host == null or not is_instance_valid(host) or i < 0 or i >= host.mounted.size():
+ 		return null
 diff -ruN src_orig/scripts/buildings/cannon.gd src/scripts/buildings/cannon.gd
 --- a/scripts/buildings/cannon.gd	1970-01-01 00:00:00.000000000 +0000
 +++ b/scripts/buildings/cannon.gd	2026-10-25 06:33:22.587249022 +0000
@@ -843,7 +903,7 @@ diff -ruN src_orig/scripts/buildings/linear_structure.gd src/scripts/buildings/l
  	kind = k
 diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
 --- a/scripts/buildings/prefab.gd	2026-10-24 19:02:37.755256490 +0000
-+++ b/scripts/buildings/prefab.gd	2026-10-25 01:26:55.135461627 +0000
++++ b/scripts/buildings/prefab.gd	2026-10-25 07:40:28.744508182 +0000
 @@ -41,6 +41,14 @@
  	if state != BUILT:
  		return
@@ -859,7 +919,7 @@ diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
  	if kind == "barracks":
  		_heal_t -= dt
  		if _heal_t <= 0.0:
-@@ -67,6 +75,14 @@
+@@ -67,6 +75,18 @@
  			out.append("Crafters %d/%d  ·  %d supplies make 1 crate" % [n, Defs.CRAFTERS_PER_WORKSHOP, Defs.CRATE_COST])
  		"watchtower":
  			out.append("Roof gun +%d%% range" % int(slot_bonus() * 100.0))
@@ -867,6 +927,10 @@ diff -ruN src_orig/scripts/buildings/prefab.gd src/scripts/buildings/prefab.gd
 +			out.append("+%d supplies after every wave it survives" % int(def.get("income", 0)))
 +		"clinic":
 +			out.append("Heals people and soldiers within %d m" % int(def.get("heal_range", 14.0)))
++		"outpost":
++			var site = G.buildings.site_near(position, float(def.get("site_range", 14.0)))
++			out.append("+%d supplies a wave, plus up to %d scrap from the site (%d left)" % [int(def.get("income", 0)), int(def.get("scrap_take", 40)), site.scrap if site else 0])
++			out.append("Zombies go for it like the HQ: wall it in")
 +		"armory":
 +			out.append("All soldiers do +25%% damage (%.0f a shot)" % G.soldiers.damage())
 +		"scrapyard":
@@ -1189,7 +1253,7 @@ diff -ruN src_orig/scripts/decor.gd src/scripts/decor.gd
  	if not _bush_cells.has(ci):
 diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 --- a/scripts/defs.gd	2026-10-24 19:02:37.755692431 +0000
-+++ b/scripts/defs.gd	2026-10-25 06:48:07.078033194 +0000
++++ b/scripts/defs.gd	2026-10-25 07:40:28.742318844 +0000
 @@ -24,7 +24,7 @@
  const JOB_NAMES := {"worker": "Workers", "soldier": "Soldiers", "loader": "Loaders", "fetcher": "Fetchers", "crafter": "Crafters"}
  const START_CRATES := 6
@@ -1221,7 +1285,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  	"mortar": {
  		"name": "Mortar", "long": "Mortar Pit", "cost": 155, "time": 7.0, "hp": 200.0, "blocks": true, "zcost": 10.0,
  		"ground": true, "trench": false, "line": false, "model": "mortar_pit", "unlock": 3,
-@@ -224,18 +230,117 @@
+@@ -224,18 +230,123 @@
  		"ground": true, "trench": false, "line": true, "model": "",
  		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
  	},
@@ -1282,6 +1346,12 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 +		"prefab": true, "half": Vector2(1.6, 1.6), "model": "pillbox", "capacity": 3, "unlock": 3,
 +		"hint": "Drag it, turn the handle, then tick", "about": "3 soldiers fire from the slits  ·  very tough",
 +	},
++	"outpost": {
++		"name": "Outpost", "long": "Scavenger Outpost", "cost": 120, "time": 12.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
++		"prefab": true, "half": Vector2(2.0, 2.0), "model": "outpost", "capacity": 2, "slot_bonus": 0.2, "unlock": 2,
++		"site_range": 14.0, "income": 40, "scrap_take": 40, "goal": true,
++		"hint": "Drag it next to a scrap site, turn the handle, then tick", "about": "Income every wave  ·  zombies go for it",
++	},
 +	"armory": {
 +		"name": "Armory", "long": "Armory", "cost": 160, "time": 20.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
 +		"prefab": true, "half": Vector2(2.0, 1.5), "model": "armory", "unlock": 4,
@@ -1332,7 +1402,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 -	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "remove"]},
 +	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]},
 +	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
-+	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
++	{"id": "base", "name": "Buildings", "tools": ["outpost", "house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic", "armory", "scrapyard"]},
 +	{"id": "high", "name": "Fortress", "tools": ["fort_wood", "fort_concrete", "room_block", "stairs", "bridge", "helipad", "helipad_large", "water_tower", "container", "pillbox"]},
 +	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
 +	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
@@ -1343,23 +1413,23 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
 -	"ammo_point", "radio", "fuel", "spikes", "mine", "dig"]
 +	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
 +	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline",
-+	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete"]
++	"water_tower", "container", "pillbox", "armory", "scrapyard", "fort_wood", "fort_concrete", "outpost"]
  const MAP_BUILDINGS := {
  	"house_two_storey": {
  		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
-@@ -268,8 +373,9 @@
+@@ -268,8 +379,9 @@
  	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
  	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
  ]
 -const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large"]
 -const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
 +const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
-+	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard"]
++	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic", "water_tower", "container", "pillbox", "armory", "scrapyard", "outpost"]
 +const GUNS := ["turret", "mortar", "sniper", "flame", "garrison", "cannon"]
  const SOLDIER_MAX := 40
  const SOLDIER_HP := 70.0
  const SOLDIER_RANGE := 14.0
-@@ -293,6 +399,11 @@
+@@ -293,6 +405,11 @@
  const TURRET_RANGE := 13.0
  const TURRET_RATE := 6.0
  const TURRET_DAMAGE := 6.0
@@ -1371,7 +1441,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const SPIKE_INTERVAL := 0.5
  const SPIKE_DAMAGE := 14.0
  const MINE_RADIUS := 4.0
-@@ -301,6 +412,7 @@
+@@ -301,6 +418,7 @@
  const Z_RUNNER := 1
  const Z_BRUTE := 2
  const REFUND_BUILT := 0.5
@@ -1379,7 +1449,7 @@ diff -ruN src_orig/scripts/defs.gd src/scripts/defs.gd
  const Z_HP_GROWTH := 0.38
  const Z_HP_LATE := 0.05
  const Z_HP := [33.0, 23.0, 330.0]
-@@ -345,6 +457,8 @@
+@@ -345,6 +463,8 @@
  	match kind:
  		"turret":
  			return TURRET_RANGE
@@ -1515,8 +1585,8 @@ diff -ruN src_orig/scripts/fetcher.gd src/scripts/fetcher.gd
  		anim_mode = "idle"
 diff -ruN src_orig/scripts/flow_field.gd src/scripts/flow_field.gd
 --- a/scripts/flow_field.gd	2026-10-24 19:02:37.754860451 +0000
-+++ b/scripts/flow_field.gd	2026-10-25 07:00:54.537129746 +0000
-@@ -68,16 +68,24 @@
++++ b/scripts/flow_field.gd	2026-10-25 07:40:28.742716070 +0000
+@@ -68,16 +68,28 @@
  func is_busy() -> bool:
  	return _busy or _dirty
  
@@ -1529,7 +1599,11 @@ diff -ruN src_orig/scripts/flow_field.gd src/scripts/flow_field.gd
 +# just obstacles that cost something to break through, so the horde takes
 +# the cheapest way in: round through a gap, or through the weakest wall.
 +func _is_goal(i: int, owner) -> bool:
-+	return grid.hq_nav.has(i) or (owner is Building and is_instance_valid(owner) and owner.def.has("lure"))
++	if grid.hq_nav.has(i):
++		return true
++	if owner is Building and is_instance_valid(owner) and owner.state == Building.BUILT:
++		return owner.def.has("lure") or bool(owner.def.get("goal", false))
++	return false
 +
 +func _goal_dist(owner) -> float:
 +	if owner is Building and is_instance_valid(owner) and owner.def.has("lure"):
@@ -1550,7 +1624,7 @@ diff -ruN src_orig/scripts/flow_field.gd src/scripts/flow_field.gd
  
  func _start() -> void:
  	var t0 := Time.get_ticks_usec()
-@@ -109,12 +117,17 @@
+@@ -109,12 +121,17 @@
  				_open[i] = 0
  				_skip[i] = 1
  			else:
@@ -1671,23 +1745,25 @@ diff -ruN src_orig/scripts/logistics.gd src/scripts/logistics.gd
  		s.refresh()
 diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 --- a/scripts/main.gd	2026-10-24 19:02:37.754392560 +0000
-+++ b/scripts/main.gd	2026-10-25 07:01:39.679952767 +0000
-@@ -26,6 +26,14 @@
++++ b/scripts/main.gd	2026-10-25 07:40:28.743957377 +0000
+@@ -26,6 +26,16 @@
  var phase := "title"
  var phase_t := 0.0
  var waves_cleared := 0
 +var repair_spent := 0
 +var map_seed := 0
 +# Player difficulty settings (Settings card), kept in settings.cfg.
-+const SPEED_CHOICES := [0.75, 1.0, 1.25, 1.5]
-+const HORDE_CHOICES := [0.5, 0.75, 1.0, 1.5, 2.0]
++const SPEED_CHOICES := [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]
++const HORDE_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
++const SPAWN_CHOICES := [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
 +var zombie_speed := 1.0
 +var horde_mult := 1.0
++var spawn_rate := 1.0
 +var _save_t := 0.0
  var test_mode := false
  var manual_clock := false
  var _queue: Array = []
-@@ -51,6 +59,9 @@
+@@ -51,6 +61,9 @@
  func _ready() -> void:
  	G.reset()
  	G.main = self
@@ -1697,7 +1773,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	for a in OS.get_cmdline_user_args():
  		if a.begins_with("--map="):
  			G.map_id = a.substr(6)
-@@ -70,6 +81,11 @@
+@@ -70,6 +83,11 @@
  		hud.show_title(true)
  		cam.focus(Defs.hq_center() + Vector3(0, 0, 6), 46.0)
  		cam.snap()
@@ -1709,7 +1785,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	var args := OS.get_cmdline_user_args()
  	for a in args:
  		_dev_arg(a)
-@@ -768,7 +784,10 @@
+@@ -768,7 +786,10 @@
  		mb.name = "Map"
  		add_child(mb)
  		G.map = mb
@@ -1721,7 +1797,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  		people.ruins = mb.survivor_points()
  	cam = CameraRig.new()
  	cam.name = "Camera"
-@@ -790,6 +809,7 @@
+@@ -790,6 +811,7 @@
  	hud.tool_pressed.connect(_on_tool_pressed)
  	hud.start_wave_pressed.connect(start_wave)
  	hud.play_pressed.connect(_on_play)
@@ -1729,7 +1805,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	hud.restart_pressed.connect(_on_restart)
  	hud.card_action.connect(_on_card_action)
  	builder.tool_changed.connect(_on_tool_changed)
-@@ -935,6 +955,10 @@
+@@ -935,6 +957,10 @@
  	match phase:
  		"build":
  			phase_t -= dt
@@ -1740,7 +1816,19 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  			if phase_t <= 0.0 and not test_mode:
  				start_wave()
  		"wave":
-@@ -1150,6 +1174,8 @@
+@@ -1035,6 +1061,11 @@
+ 	builder.set_tool(t)
+ 
+ func _on_card_action(id: String, target) -> void:
++	if id.begins_with("plus:") or id.begins_with("minus:"):
++		var key := id.get_slice(":", 1)
++		if key in ["zspeed", "horde", "spawn"]:
++			_step_setting(key, 1 if id.begins_with("plus:") else -1)
++			return
+ 	if id.begins_with("plus:"):
+ 		var job := id.substr(5)
+ 		var why: String = people.add_job(job)
+@@ -1150,6 +1181,8 @@
  			_ui("ui_tap")
  			hud.toast("Auto rebuild %s" % ("on" if walls.auto_rebuild else "off"))
  			hud.show_card(target)
@@ -1749,20 +1837,10 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  		"claim_fence":
  			_card_result(target.claim(), "Workers will make it part of your walls")
  		"sound_test":
-@@ -1164,6 +1190,24 @@
+@@ -1164,6 +1197,14 @@
  			quality.next_mode()
  			_ui("ui_tap")
  			hud.toast("Graphics: %s" % quality.label())
-+		"zspeed":
-+			zombie_speed = _next_choice(SPEED_CHOICES, zombie_speed)
-+			_save_game_settings()
-+			_ui("ui_tap")
-+			hud.toast("Zombie speed %d%%  ·  new zombies from now on" % int(round(zombie_speed * 100.0)))
-+		"horde":
-+			horde_mult = _next_choice(HORDE_CHOICES, horde_mult)
-+			_save_game_settings()
-+			_ui("ui_tap")
-+			hud.toast("Horde size %d%%  ·  from the next wave" % int(round(horde_mult * 100.0)))
 +		"raise":
 +			_card_result(target.raise_one(), "Workers will add a floor")
 +		"raise_all":
@@ -1774,7 +1852,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _card_result(why: String, ok_text: String) -> void:
  	if why != "":
-@@ -1191,7 +1235,7 @@
+@@ -1191,7 +1232,7 @@
  		_ui("zone_breached")
  		cam.shake(0.4)
  	elif secured:
@@ -1783,7 +1861,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  
  func _on_tool_changed(t: String) -> void:
  	var h := ""
-@@ -1211,7 +1255,9 @@
+@@ -1211,7 +1252,9 @@
  			h = "Tap ground or a glowing slot, then tick"
  		elif t == "wall" or t == "concrete":
  			h = "Tap points. Drag to look. Tick to build"
@@ -1794,7 +1872,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  			h = "Tap the start, tap the end, then tick"
  		elif not Defs.is_prefab(t):
  			h = "Tap to place, then tick"
-@@ -1230,14 +1276,40 @@
+@@ -1230,14 +1273,77 @@
  	get_tree().reload_current_scene()
  
  func wave_size(w: int) -> int:
@@ -1821,8 +1899,10 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 +	if cf.load(QualityManager.SETTINGS_PATH) == OK:
 +		var sp := float(cf.get_value("game", "zombie_speed", 1.0))
 +		var hm := float(cf.get_value("game", "horde", 1.0))
++		var sr := float(cf.get_value("game", "spawn_rate", 1.0))
 +		zombie_speed = sp if SPEED_CHOICES.has(sp) else 1.0
 +		horde_mult = hm if HORDE_CHOICES.has(hm) else 1.0
++		spawn_rate = sr if SPAWN_CHOICES.has(sr) else 1.0
 +
 +func _save_game_settings() -> void:
 +	if test_mode:
@@ -1831,15 +1911,50 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 +	cf.load(QualityManager.SETTINGS_PATH)
 +	cf.set_value("game", "zombie_speed", zombie_speed)
 +	cf.set_value("game", "horde", horde_mult)
++	cf.set_value("game", "spawn_rate", spawn_rate)
 +	cf.save(QualityManager.SETTINGS_PATH)
 +
-+static func _next_choice(choices: Array, v: float) -> float:
++static func _step_choice(choices: Array, v: float, step: int) -> float:
 +	var i := choices.find(v)
-+	return choices[(i + 1) % choices.size()]
++	if i < 0:
++		i = choices.find(1.0)
++	return choices[clampi(i + step, 0, choices.size() - 1)]
++
++func game_setting(key: String) -> float:
++	match key:
++		"zspeed":
++			return zombie_speed
++		"horde":
++			return horde_mult
++		"spawn":
++			return spawn_rate
++	return 1.0
++
++func setting_choices(key: String) -> Array:
++	match key:
++		"zspeed":
++			return SPEED_CHOICES
++		"horde":
++			return HORDE_CHOICES
++	return SPAWN_CHOICES
++
++func _step_setting(key: String, step: int) -> void:
++	var v := _step_choice(setting_choices(key), game_setting(key), step)
++	match key:
++		"zspeed":
++			zombie_speed = v
++		"horde":
++			horde_mult = v
++		"spawn":
++			spawn_rate = v
++	_save_game_settings()
++	_ui("ui_tap")
++	var when := "new zombies from now on" if key == "zspeed" else "from the next wave"
++	hud.toast("%s %d%%  ·  %s" % [{"zspeed": "Zombie speed", "horde": "Horde size", "spawn": "Spawn rate"}[key], int(round(v * 100.0)), when])
  
  func _plan_edges() -> void:
  	var n := 1
-@@ -1267,6 +1339,7 @@
+@@ -1267,6 +1373,7 @@
  func start_wave() -> void:
  	if phase != "build":
  		return
@@ -1847,7 +1962,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	phase = "wave"
  	zombies.wave = wave
  	_wave_t = 0.0
-@@ -1275,8 +1348,8 @@
+@@ -1275,8 +1382,8 @@
  	var count := wave_size(wave)
  	var runner_frac := 0.0
  	if wave >= 3:
@@ -1858,7 +1973,16 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	for i in count - brutes:
  		_queue.append(Defs.Z_RUNNER if G.rng.randf() < runner_frac else Defs.Z_WALKER)
  	_queue.shuffle()
-@@ -1303,14 +1376,15 @@
+@@ -1286,7 +1393,7 @@
+ 	var duration := 22.0 + wave * 4.0
+ 	if wave == 1:
+ 		duration = 40.0
+-	_spawn_gap = maxf(0.12, duration / count)
++	_spawn_gap = maxf(0.03, duration / count / spawn_rate)
+ 	_spawn_t = 0.5
+ 	var sub := "From the %s" % _edge_text()
+ 	if brutes > 0:
+@@ -1303,14 +1410,15 @@
  
  func _spawn_step(dt: float) -> void:
  	_spawn_t -= dt
@@ -1876,7 +2000,7 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  				break
  			var kind: int = _queue.pop_back()
  			var off := Vector3(G.rng.randf_range(-2.5, 2.5), 0, G.rng.randf_range(-2.5, 2.5))
-@@ -1345,8 +1419,18 @@
+@@ -1345,8 +1453,26 @@
  func _wave_cleared() -> void:
  	waves_cleared = wave
  	var bonus := wave_bonus()
@@ -1885,10 +2009,18 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
 +	var farm := 0
 +	for b in buildings.built_of("greenhouse"):
 +		farm += int(b.def.get("income", 0))
-+	add_supplies(bonus + farm)
-+	var sub := "+%d supplies" % (bonus + farm)
++	var post := 0
++	for b in buildings.built_of("outpost"):
++		post += int(b.def.get("income", 0))
++		var site = buildings.site_near(b.position, float(b.def.get("site_range", 14.0)))
++		if site != null:
++			post += site.take(int(b.def.get("scrap_take", 40)))
++	add_supplies(bonus + farm + post)
++	var sub := "+%d supplies" % (bonus + farm + post)
 +	if farm > 0:
 +		sub += " (%d from farms)" % farm
++	if post > 0:
++		sub += " (%d from outposts)" % post
 +	if people.saved_wave > 0:
 +		sub += "  ·  %d saved" % people.saved_wave
 +	if people.lost_wave > 0:
@@ -1897,12 +2029,14 @@ diff -ruN src_orig/scripts/main.gd src/scripts/main.gd
  	_ui("wave_cleared")
  	logi.on_wave_cleared()
  	wave_cleared.emit(wave)
-@@ -1354,14 +1438,47 @@
+@@ -1354,14 +1480,49 @@
  	phase = "build"
  	phase_t = Defs.BUILD_PHASE_TIME
  	_plan_edges()
 +	if wave == 3 and buildings.count_built("workshop") == 0:
 +		hud.toast("Guns use up ammo crates. Build a Workshop and add Crafters")
++	if wave == 2:
++		hud.toast("Outposts: build one by a scrap site for income. Zombies will go for it")
  	for t in Defs.TOOLS:
  		if int(Defs.BUILD[t].get("unlock", 0)) == wave:
  			hud.toast("%s unlocked" % String(Defs.BUILD[t].get("long", t)))
@@ -2988,15 +3122,13 @@ diff -ruN src_orig/scripts/soldier_manager.gd src/scripts/soldier_manager.gd
  					score += others * 2.5
 diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
 --- a/scripts/ui/card_models.gd	2026-10-24 19:02:37.754539227 +0000
-+++ b/scripts/ui/card_models.gd	2026-10-25 00:34:49.176645065 +0000
-@@ -101,14 +101,23 @@
++++ b/scripts/ui/card_models.gd	2026-10-25 07:40:41.735504693 +0000
+@@ -101,14 +101,27 @@
  	func card_lines() -> Array:
  		var out := []
  		if G.main and G.main.quality:
 -			out.append("Graphics: %s" % G.main.quality.label())
 +			out.append("Graphics: %s  ·  %s" % [G.main.quality.label(), G.main.quality.fps_label()])
-+		if G.main:
-+			out.append("Zombies: speed %d%%  ·  horde %d%%" % [int(round(G.main.zombie_speed * 100.0)), int(round(G.main.horde_mult * 100.0))])
  		out.append_array(Array(diagnostic().split("\n")))
  		return out
  	func card_buttons() -> Array:
@@ -3006,12 +3138,18 @@ diff -ruN src_orig/scripts/ui/card_models.gd src/scripts/ui/card_models.gd
  			q = QualityManager.MODE_NAMES[G.main.quality.mode].to_upper()
 -		return [["quality", "QUALITY: %s" % q, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
 +			f = str(G.main.quality.fps_cap) if G.main.quality.fps_cap > 0 else "MAX"
-+		var zs := 100
-+		var hm := 100
-+		if G.main:
-+			zs = int(round(G.main.zombie_speed * 100.0))
-+			hm = int(round(G.main.horde_mult * 100.0))
-+		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["zspeed", "SPEED: %d%%" % zs, true], ["horde", "HORDE: %d%%" % hm, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
++		return [["quality", "QUALITY: %s" % q, true], ["fps", "FPS: %s" % f, true], ["sound_test", "TEST SOUND", true], ["mute", "UNMUTE" if AudioServer.is_bus_mute(0) else "MUTE", true]]
++	# Zombie difficulty: - / + rows, shown as % of normal.
++	func card_rows() -> Array:
++		var out := []
++		if G.main == null:
++			return out
++		for r in [["zspeed", "Zombie speed", "% speed"], ["horde", "Horde size", "% zombies a wave"], ["spawn", "Spawn rate", "% how fast they pour in"]]:
++			var v: float = G.main.game_setting(r[0])
++			var ch: Array = G.main.setting_choices(r[0])
++			var i := ch.find(v)
++			out.append([r[0], r[1], int(round(v * 100.0)), i > 0, i < ch.size() - 1, r[2]])
++		return out
  
  class Ask:
  	extends RefCounted
@@ -3116,14 +3254,14 @@ diff -ruN src_orig/scripts/ui/hud.gd src/scripts/ui/hud.gd
  	text(ci, Vector2(br.position.x + 30, br.position.y + 36), "PLAY", 22, ACCENT_DK, font_heavy, HORIZONTAL_ALIGNMENT_CENTER, br.size.x)
 diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
 --- a/scripts/ui/icons.gd	2026-10-24 19:02:37.754675490 +0000
-+++ b/scripts/ui/icons.gd	2026-10-25 07:00:40.998819055 +0000
++++ b/scripts/ui/icons.gd	2026-10-25 07:40:28.744869939 +0000
 @@ -1,7 +1,13 @@
  class_name Icons
  extends RefCounted
  
 +const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
 +	"clinic": "heart", "water_tower": "watchtower", "container": "depot", "pillbox": "garrison", "armory": "soldier", "scrapyard": "supplies",
-+	"clear_house": "sell", "cannon": "turret", "fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
++	"outpost": "flag", "clear_house": "sell", "cannon": "turret", "fort_wood": "garrison", "fort_concrete": "concrete", "raise": "upgrade", "raise_all": "upgrade_run",
 +	"lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
 +
  static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:
@@ -3142,6 +3280,19 @@ diff -ruN src_orig/scripts/ui/icons.gd src/scripts/ui/icons.gd
  			return "auto"
  		"floor":
  			return "room_block"
+diff -ruN src_orig/scripts/ui/info_card.gd src/scripts/ui/info_card.gd
+--- a/scripts/ui/info_card.gd	2026-10-24 19:02:37.754703505 +0000
++++ b/scripts/ui/info_card.gd	2026-10-25 07:39:47.442660350 +0000
+@@ -183,7 +183,8 @@
+ func _draw_row(row: Array, x: float, y: float, w: float) -> void:
+ 	var job: String = row[0]
+ 	var bsz := 48.0
+-	var jicon: String = {"worker": "hammer", "soldier": "soldier", "loader": "crate", "fetcher": "supplies", "crafter": "workshop"}.get(job, "person")
++	var jicon: String = {"worker": "hammer", "soldier": "soldier", "loader": "crate", "fetcher": "supplies", "crafter": "workshop",
++		"zspeed": "zombie", "horde": "zombie", "spawn": "clock"}.get(job, "person")
+ 	Icons.draw(self, jicon, Rect2(x, y + 8.0, 22.0, 22.0), Hud.ACCENT)
+ 	draw_string(Hud.font_heavy, Vector2(x + 30.0, y + 24), String(row[1]), HORIZONTAL_ALIGNMENT_LEFT, w * 0.45, 16, Hud.TEXT)
+ 	draw_string(Hud.font_bold, Vector2(x + 30.0, y + 42), String(row[5]), HORIZONTAL_ALIGNMENT_LEFT, w * 0.5, 12, Hud.MUTED)
 diff -ruN src_orig/scripts/ui/world_overlay.gd src/scripts/ui/world_overlay.gd
 --- a/scripts/ui/world_overlay.gd	2026-10-24 19:02:37.754738444 +0000
 +++ b/scripts/ui/world_overlay.gd	2026-10-24 19:07:05.110160545 +0000

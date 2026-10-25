@@ -762,6 +762,12 @@ func _placeholder(kind: String) -> Node3D:
 		"fort_wood", "fort_concrete":
 			_mi(fort_module_mesh(kind == "fort_concrete", [0], 15), mat_vc, root, "Body")
 			_marker(root, "RoofSlot1", Vector3(0, 3.25, 0))
+		"outpost":
+			_mi(_cached("outpost", _mesh_outpost), mat_vc, root, "Body")
+			_marker(root, "RoofSlot1", Vector3(1.1, 1.62, -1.1))
+			_marker(root, "Port1", Vector3(-1.9, 1.1, -0.6), PI * 0.5)
+			_marker(root, "Port2", Vector3(0.6, 1.1, 1.9), PI)
+			_marker(root, "Door", Vector3(-1.0, 0, 2.4))
 		"water_tower":
 			_mi(_cached("water_tower", _mesh_water_tower), mat_vc, root, "Body")
 			_marker(root, "RoofSlot1", Vector3(0, 10.75, 0))
@@ -1009,6 +1015,30 @@ func _mesh_cannon_barrel() -> ArrayMesh:
 	k.cyl(0.11, 0.13, 1.6, Vector3(0, 0, -0.9), C_GUNMETAL, Vector3(PI * 0.5, 0, 0), 10)
 	k.cyl(0.17, 0.17, 0.32, Vector3(0, 0, -1.6), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
 	k.cyl(0.2, 0.2, 0.35, Vector3(0, 0, -0.08), C_METAL, Vector3(PI * 0.5, 0, 0), 10)
+	return k.build()
+
+func _mesh_outpost() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.box(Vector3(4.2, 0.1, 4.2), Vector3(0, 0.05, 0), C_DIRT)
+	for i in 7:
+		var t := -1.8 + i * 0.6
+		k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.26, -1.9), C_FABRIC)
+		k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.58, -1.9), C_FABRIC)
+		k.box(Vector3(0.4, 0.32, 0.58), Vector3(-1.9, 0.26, t), C_FABRIC)
+		k.box(Vector3(0.4, 0.32, 0.58), Vector3(-1.9, 0.58, t), C_FABRIC)
+		k.box(Vector3(0.4, 0.32, 0.58), Vector3(1.9, 0.26, t), C_FABRIC)
+		if i > 2:
+			k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.26, 1.9), C_FABRIC)
+			k.box(Vector3(0.58, 0.32, 0.4), Vector3(t, 0.58, 1.9), C_FABRIC)
+	k.prism(Vector3(2.0, 1.4, 2.2), Vector3(-0.6, 0.8, 0.4), C_OLIVE, Vector3(0, PI * 0.5, 0))
+	for p in [Vector3(0.6, 0, -0.4), Vector3(0.9, 0, 0.3)]:
+		k.box(Vector3(0.5, 0.36, 0.36), p + Vector3(0, 0.28, 0), C_OLIVE_LT)
+	for x in [0.5, 1.7]:
+		for z in [-1.7, -0.5]:
+			k.box(Vector3(0.12, 1.5, 0.12), Vector3(x, 0.75, z), C_WOOD)
+	k.box(Vector3(1.5, 0.12, 1.5), Vector3(1.1, 1.5, -1.1), C_WOOD_DK)
+	k.cyl(0.04, 0.05, 4.2, Vector3(-1.6, 2.1, 1.6), C_METAL)
+	k.box(Vector3(0.8, 0.5, 0.03), Vector3(-1.2, 3.9, 1.6), Color(0.85, 0.65, 0.12))
 	return k.build()
 
 func _mesh_water_tower() -> ArrayMesh:
