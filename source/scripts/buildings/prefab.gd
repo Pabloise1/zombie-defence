@@ -41,6 +41,14 @@ func tick(dt: float) -> void:
 	if state != BUILT:
 		return
 	port_tick(dt)
+	if def.has("heal"):
+		_heal_t -= dt
+		if _heal_t <= 0.0:
+			_heal_t = 1.0
+			var r2 := pow(float(def.get("heal_range", 14.0)), 2.0)
+			for p in G.people.all_people():
+				if is_instance_valid(p) and not p.dead and p.hp < p.max_hp and p.position.distance_squared_to(position) < r2:
+					p.hp = minf(p.max_hp, p.hp + float(def["heal"]))
 	if kind == "barracks":
 		_heal_t -= dt
 		if _heal_t <= 0.0:
@@ -67,6 +75,10 @@ func card_lines() -> Array:
 			out.append("Crafters %d/%d  ·  %d supplies make 1 crate" % [n, Defs.CRAFTERS_PER_WORKSHOP, Defs.CRATE_COST])
 		"watchtower":
 			out.append("Roof gun +%d%% range" % int(slot_bonus() * 100.0))
+		"greenhouse":
+			out.append("+%d supplies after every wave it survives" % int(def.get("income", 0)))
+		"clinic":
+			out.append("Heals people and soldiers within %d m" % int(def.get("heal_range", 14.0)))
 		_:
 			out.append(String(def.get("about", "")))
 	var free := 0

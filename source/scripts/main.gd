@@ -1411,8 +1411,13 @@ func wave_bonus() -> int:
 func _wave_cleared() -> void:
 	waves_cleared = wave
 	var bonus := wave_bonus()
-	add_supplies(bonus)
-	var sub := "+%d supplies" % bonus
+	var farm := 0
+	for b in buildings.built_of("greenhouse"):
+		farm += int(b.def.get("income", 0))
+	add_supplies(bonus + farm)
+	var sub := "+%d supplies" % (bonus + farm)
+	if farm > 0:
+		sub += " (%d from farms)" % farm
 	if people.saved_wave > 0:
 		sub += "  ·  %d saved" % people.saved_wave
 	if people.lost_wave > 0:

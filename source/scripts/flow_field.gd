@@ -73,6 +73,8 @@ func _goal_bias(owner) -> float:
 		return 6.0
 	if owner is HQBuilding:
 		return 0.0
+	if owner is Building and owner.def.has("lure"):
+		return -float(owner.def["lure"])
 	if owner is LinearStructure:
 		return 5.0
 	if Defs.GUNS.has(owner.kind):

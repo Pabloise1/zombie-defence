@@ -285,7 +285,9 @@ func _layout() -> void:
 		tbh = 64.0
 		th = 34.0
 	var handle := 18.0
-	var shh := handle + th + 10.0 + tbh + pad + 4.0
+	var shown: Array = _tab_tools(tab)
+	var rows := maxi(1, int(ceil(shown.size() / float(n))))
+	var shh := handle + th + 10.0 + tbh * rows + tgap * (rows - 1) + pad + 4.0
 	sheet.size = Vector2(shw, shh)
 	var k := ease_out(_sheet_k)
 	sheet.position = Vector2(vs.x * 0.5 - shw * 0.5, lerpf(vs.y + 10.0, B - shh, k))
@@ -297,14 +299,14 @@ func _layout() -> void:
 		tabs[i].size = Vector2(tw, th)
 		tabs[i].set_active(tabs[i].id == tab)
 		tabs[i].queue_redraw()
-	var shown: Array = _tab_tools(tab)
-	var rw := tbw * shown.size() + tgap * (shown.size() - 1)
-	var bx0 := (shw - rw) * 0.5
 	for b in buttons:
 		var kk := shown.find(b.tool)
 		b.visible = kk >= 0
 		if kk >= 0:
-			b.position = Vector2(bx0 + kk * (tbw + tgap), handle + th + 10.0)
+			var row := kk / n
+			var in_row := mini(n, shown.size() - row * n)
+			var bx0 := (shw - (tbw * in_row + tgap * (in_row - 1))) * 0.5
+			b.position = Vector2(bx0 + (kk % n) * (tbw + tgap), handle + th + 10.0 + row * (tbh + tgap))
 			b.size = Vector2(tbw, tbh)
 			b.queue_redraw()
 	var narrow_chip := R - L < 470.0

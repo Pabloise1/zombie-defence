@@ -116,6 +116,11 @@ func _model_name() -> String:
 func _make_model() -> void:
 	model = Art.model(_model_name())
 	add_child(model)
+	if def.get("decor", false):
+		if rest_yaw == 0.0:
+			rest_yaw = (randi() % 4) * PI * 0.5
+		model.rotation.y = rest_yaw
+		model.scale = Vector3.ONE * float(def.get("scale", 1.0))
 	_on_model_ready()
 	if host == null and not rect:
 		_apply_rest()

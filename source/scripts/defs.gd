@@ -224,18 +224,79 @@ const BUILD := {
 		"ground": true, "trench": false, "line": true, "model": "",
 		"hint": "Drag to mark a trench", "about": "Zombies fall in, climb out slowly",
 	},
+	"car_wreck": {
+		"name": "Car", "long": "Car Wreck", "cost": 35, "time": 6.0, "hp": 1500.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(1.0, 2.45), "model": "suburb/car_sedan_wreck",
+		"hint": "Drag it, turn the handle, then tick", "about": "Junk barricade. Plug a gap or wall in with cars",
+	},
+	"van_wreck": {
+		"name": "Van", "long": "Van Wreck", "cost": 55, "time": 8.0, "hp": 2400.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(1.49, 3.25), "model": "suburb/van_wreck",
+		"hint": "Drag it, turn the handle, then tick", "about": "Heavier junk barricade",
+	},
+	"bus_wreck": {
+		"name": "Bus", "long": "School Bus Wreck", "cost": 120, "time": 14.0, "hp": 6000.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(1.54, 6.3), "model": "suburb/school_bus_wreck", "unlock": 3,
+		"hint": "Drag it, turn the handle, then tick", "about": "12 m of steel. A wall in one go",
+	},
+	"decoy": {
+		"name": "Decoy", "long": "Noise Decoy", "cost": 60, "time": 5.0, "hp": 1200.0, "blocks": true, "zcost": 6.0,
+		"ground": true, "trench": false, "line": false, "model": "decoy", "unlock": 3, "lure": 30.0,
+		"hint": "Tap to place. Zombies go for it first", "about": "Lures the horde. Ring it with mines",
+	},
+	"greenhouse": {
+		"name": "Farm", "long": "Greenhouse", "cost": 150, "time": 20.0, "hp": 1800.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(2.5, 1.5), "model": "greenhouse", "unlock": 2, "income": 45,
+		"hint": "Drag it, turn the handle, then tick", "about": "+45 supplies after every wave it survives",
+	},
+	"clinic": {
+		"name": "Clinic", "long": "Clinic", "cost": 130, "time": 20.0, "hp": 2600.0, "blocks": true, "zcost": 6.0,
+		"prefab": true, "half": Vector2(2.0, 1.5), "model": "clinic", "unlock": 3, "heal": 5.0, "heal_range": 14.0,
+		"hint": "Drag it, turn the handle, then tick", "about": "Heals everyone within 14 m",
+	},
+	"lamp": {
+		"name": "Lamp", "long": "Street Lamp", "cost": 10, "time": 2.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
+		"ground": true, "trench": false, "line": false, "model": "suburb/streetlight", "decor": true,
+		"hint": "Tap to place", "about": "Decoration",
+	},
+	"bench": {
+		"name": "Bench", "long": "Bench", "cost": 5, "time": 1.5, "hp": 0.0, "blocks": false, "zcost": 1.0,
+		"ground": true, "trench": false, "line": false, "model": "suburb/bench", "decor": true,
+		"hint": "Tap to place", "about": "Decoration",
+	},
+	"tree": {
+		"name": "Tree", "long": "Tree", "cost": 15, "time": 3.0, "hp": 0.0, "blocks": false, "zcost": 1.0,
+		"ground": true, "trench": false, "line": false, "model": "suburb/tree_oak", "decor": true, "scale": 0.5,
+		"hint": "Tap to plant", "about": "Decoration",
+	},
+	"bush": {
+		"name": "Bush", "long": "Bush", "cost": 5, "time": 1.5, "hp": 0.0, "blocks": false, "zcost": 1.0,
+		"ground": true, "trench": false, "line": false, "model": "suburb/bush_a", "decor": true,
+		"hint": "Tap to plant", "about": "Decoration",
+	},
+	"swings": {
+		"name": "Swings", "long": "Swings", "cost": 20, "time": 4.0, "hp": 0.0, "blocks": false, "zcost": 1.0, "size": 2,
+		"ground": true, "trench": false, "line": false, "model": "suburb/playground_swings", "decor": true,
+		"hint": "Tap to place", "about": "Decoration",
+	},
+	"trampoline": {
+		"name": "Bounce", "long": "Trampoline", "cost": 20, "time": 4.0, "hp": 0.0, "blocks": false, "zcost": 1.0, "size": 2,
+		"ground": true, "trench": false, "line": false, "model": "suburb/trampoline", "decor": true,
+		"hint": "Tap to place", "about": "Decoration",
+	},
 }
 const TABS := [
 	{"id": "defend", "name": "Defend", "tools": ["turret", "mortar", "sniper", "flame", "garrison"]},
-	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire"]},
-	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower"]},
+	{"id": "build", "name": "Build", "tools": ["concrete", "wall", "gate", "platform", "wire", "car_wreck", "van_wreck", "bus_wreck"]},
+	{"id": "base", "name": "Buildings", "tools": ["house", "depot", "workshop", "barracks", "watchtower", "greenhouse", "clinic"]},
 	{"id": "high", "name": "Fortress", "tools": ["room_block", "stairs", "bridge", "helipad", "helipad_large"]},
-	{"id": "supply", "name": "Supply", "tools": ["ammo_point", "radio", "fuel"]},
-	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "remove"]},
+	{"id": "supply", "name": "Extras", "tools": ["ammo_point", "radio", "fuel", "lamp", "bench", "tree", "bush", "swings", "trampoline"]},
+	{"id": "traps", "name": "Traps", "tools": ["spikes", "mine", "dig", "decoy", "remove"]},
 ]
 const TOOLS := ["turret", "mortar", "sniper", "flame", "garrison", "concrete", "wall", "gate", "platform", "wire",
 	"house", "depot", "workshop", "barracks", "watchtower", "room_block", "stairs", "bridge", "helipad", "helipad_large",
-	"ammo_point", "radio", "fuel", "spikes", "mine", "dig"]
+	"ammo_point", "radio", "fuel", "spikes", "mine", "dig",
+	"car_wreck", "van_wreck", "bus_wreck", "decoy", "greenhouse", "clinic", "lamp", "bench", "tree", "bush", "swings", "trampoline"]
 const MAP_BUILDINGS := {
 	"house_two_storey": {
 		"name": "House", "long": "Two-storey House", "claim": 55, "claim_time": 20.0, "hp": 3400.0, "blocks": true, "zcost": 6.0,
@@ -268,7 +329,8 @@ const MAPS := [
 	{"id": "forest", "name": "Forest", "about": "Woods, a lake", "ready": false},
 	{"id": "city", "name": "City", "about": "Tall blocks", "ready": false},
 ]
-const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large"]
+const PREFABS := ["house", "depot", "workshop", "barracks", "watchtower", "bastion", "bastion_c", "room_block", "stairs", "helipad", "helipad_large",
+	"car_wreck", "van_wreck", "bus_wreck", "greenhouse", "clinic"]
 const GUNS := ["turret", "mortar", "sniper", "flame", "garrison"]
 const SOLDIER_MAX := 40
 const SOLDIER_HP := 70.0

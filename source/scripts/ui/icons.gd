@@ -1,7 +1,11 @@
 class_name Icons
 extends RefCounted
 
+const ALIAS := {"car_wreck": "rubble", "van_wreck": "rubble", "bus_wreck": "rubble", "decoy": "radio", "greenhouse": "house",
+	"clinic": "heart", "lamp": "flag", "bench": "platform", "tree": "zone", "bush": "zone", "swings": "person", "trampoline": "person"}
+
 static func draw(ci: CanvasItem, kind: String, r: Rect2, col: Color) -> void:
+	kind = ALIAS.get(kind, kind)
 	var c := r.get_center()
 	var s := minf(r.size.x, r.size.y)
 	match kind:

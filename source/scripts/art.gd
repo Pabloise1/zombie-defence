@@ -727,6 +727,22 @@ func _placeholder(kind: String) -> Node3D:
 			_mi(_cached("scrap_bundle", _mesh_scrap_bundle), mat_vc_metal, root, "Body")
 		"fetcher":
 			_build_worker(root, true)
+		"decoy":
+			_mi(_cached("decoy", _mesh_decoy), mat_vc_metal, root, "Body")
+			var dl := MeshInstance3D.new()
+			var dlm := SphereMesh.new()
+			dlm.radius = 0.12
+			dlm.height = 0.24
+			dl.mesh = dlm
+			dl.set_surface_override_material(0, mat_lamp_red)
+			dl.position = Vector3(0, 3.55, 0)
+			root.add_child(dl)
+		"greenhouse":
+			_mi(_cached("greenhouse", _mesh_greenhouse), mat_vc, root, "Body")
+			_marker(root, "Door", Vector3(0, 0, 1.9))
+		"clinic":
+			_mi(_cached("clinic", _mesh_clinic), mat_vc, root, "Body")
+			_marker(root, "Door", Vector3(0, 0, 1.9))
 		_:
 			var k := MeshKit.new()
 			k.box(Vector3(1.6, 1.6, 1.6), Vector3(0, 0.8, 0), Color.MAGENTA)
@@ -844,6 +860,57 @@ func _mesh_radio_mast() -> ArrayMesh:
 		k.box(Vector3(0.5, 0.03, 0.03), Vector3(0, 0.6 + j * 0.65, 0), C_METAL, Vector3(0, j * 0.6, 0))
 	k.cyl(0.02, 0.02, 1.4, Vector3(0, 7.6, 0), C_METAL)
 	k.box(Vector3(0.6, 0.4, 0.5), Vector3(0.5, 0.45, 0.4), C_OLIVE)
+	return k.build()
+
+func _mesh_decoy() -> ArrayMesh:
+	var k := MeshKit.new()
+	k.box(Vector3(1.2, 0.25, 1.2), Vector3(0, 0.12, 0), C_CONCRETE_DK)
+	k.box(Vector3(0.7, 0.5, 0.5), Vector3(0.25, 0.5, 0.25), C_OLIVE)
+	k.cyl(0.07, 0.09, 3.4, Vector3(0, 1.8, 0), C_METAL)
+	for i in 3:
+		var a := i * TAU / 3.0
+		var d := Vector3(sin(a), 0, cos(a))
+		k.cyl(0.26, 0.08, 0.55, Vector3(0, 3.1, 0) + d * 0.3, C_GUNMETAL, Vector3(PI * 0.5, a, 0), 10)
+	k.box(Vector3(0.5, 0.06, 0.06), Vector3(0, 2.6, 0), Color(0.85, 0.65, 0.1))
+	return k.build()
+
+func _mesh_greenhouse() -> ArrayMesh:
+	var k := MeshKit.new()
+	var glass := Color(0.6, 0.78, 0.72)
+	var frame := Color(0.85, 0.86, 0.82)
+	var w := 4.8
+	var d := 2.8
+	k.box(Vector3(w + 0.2, 0.3, d + 0.2), Vector3(0, 0.15, 0), C_CONCRETE)
+	k.box(Vector3(w, 1.9, d), Vector3(0, 1.25, 0), glass)
+	k.prism(Vector3(d, 1.0, w), Vector3(0, 2.7, 0), glass, Vector3(0, PI * 0.5, 0))
+	for x in [-2.4, -1.2, 0.0, 1.2, 2.4]:
+		k.box(Vector3(0.08, 1.95, d + 0.06), Vector3(x, 1.25, 0), frame)
+	for z in [-1.4, 1.4]:
+		k.box(Vector3(w + 0.06, 0.08, 0.08), Vector3(0, 2.2, z), frame)
+		k.box(Vector3(w + 0.06, 0.08, 0.08), Vector3(0, 0.32, z), frame)
+	k.box(Vector3(w + 0.06, 0.1, 0.1), Vector3(0, 3.2, 0), frame)
+	for z in [-0.75, 0.75]:
+		k.box(Vector3(w - 0.6, 0.35, 0.6), Vector3(0, 0.48, z), C_DIRT)
+		for i in 7:
+			k.sphere(0.22, Vector3(-1.8 + i * 0.6, 0.78, z), Color(0.24, 0.5, 0.18), Vector3(1, 0.8, 1), Vector3.ZERO, 6, 4)
+	k.box(Vector3(0.9, 1.8, 0.06), Vector3(0, 1.2, 1.42), Color(0.5, 0.62, 0.58))
+	return k.build()
+
+func _mesh_clinic() -> ArrayMesh:
+	var k := MeshKit.new()
+	var white := Color(0.86, 0.85, 0.8)
+	var red := Color(0.75, 0.12, 0.1)
+	k.box(Vector3(4.1, 0.25, 3.1), Vector3(0, 0.12, 0), C_CONCRETE)
+	k.box(Vector3(3.8, 2.6, 2.8), Vector3(0, 1.55, 0), white)
+	k.box(Vector3(4.0, 0.2, 3.0), Vector3(0, 2.95, 0), Color(0.62, 0.62, 0.6))
+	k.box(Vector3(1.6, 0.04, 0.45), Vector3(0, 3.07, 0), red)
+	k.box(Vector3(0.45, 0.04, 1.6), Vector3(0, 3.07, 0), red)
+	k.box(Vector3(0.9, 0.28, 0.04), Vector3(0, 2.3, 1.42), red)
+	k.box(Vector3(0.28, 0.9, 0.04), Vector3(0, 2.3, 1.42), red)
+	k.box(Vector3(1.0, 1.9, 0.06), Vector3(0, 1.2, 1.41), Color(0.3, 0.42, 0.45))
+	for x in [-1.4, 1.4]:
+		k.box(Vector3(0.7, 0.6, 0.05), Vector3(x, 1.7, 1.42), Color(0.45, 0.6, 0.65))
+	k.box(Vector3(1.6, 0.08, 0.9), Vector3(0, 2.25, 1.85), white)
 	return k.build()
 
 func _mesh_fuel_tank() -> ArrayMesh:
